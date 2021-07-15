@@ -1,0 +1,22 @@
+#     __                               __
+#    |  \                             |  \
+#    | $$      __    __  ______ ____   \$$ _______    ______
+#    | $$     |  \  |  \|      \    \ |  \|       \  /      \
+#    | $$     | $$  | $$| $$$$$$\$$$$\| $$| $$$$$$$\|  $$$$$$\
+#    | $$     | $$  | $$| $$ | $$ | $$| $$| $$  | $$| $$    $$
+#    | $$_____| $$__/ $$| $$ | $$ | $$| $$| $$  | $$| $$$$$$$$
+#    | $$     \\$$    $$| $$ | $$ | $$| $$| $$  | $$ \$$     \
+#     \$$$$$$$$ \$$$$$$  \$$  \$$  \$$ \$$ \$$   \$$  \$$$$$$$
+#
+#  Created by ethaniccc @ https://www.github.com/ethaniccc
+# ------------------------------------------------------------------------------
+#  Copyright (C) ethaniccc - All Rights Reserved
+#  Unauthorized copying of this file, via any medium is strictly prohibited
+#  Proprietary and confidential
+#  Written by Benjamin <schooldocumentsandstuff@gmail.com> on July, 2021
+
+prefix: "§l§8[§5Lum§dine§8]"
+
+socket_server:
+  address: "127.0.0.1"
+  port: 3000
