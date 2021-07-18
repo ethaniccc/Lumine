@@ -5,7 +5,9 @@ namespace ethaniccc\Lumine\thread;
 use ethaniccc\Lumine\events\ConnectionErrorEvent;
 use ethaniccc\Lumine\events\SendErrorEvent;
 use ethaniccc\Lumine\events\SocketEvent;
+use ethaniccc\Lumine\events\UnknownEvent;
 use ethaniccc\Lumine\Settings;
+use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\Thread;
 
 final class LumineSocketThread extends Thread {
@@ -65,16 +67,43 @@ final class LumineSocketThread extends Thread {
 						"message" => "Unable to read buffer from the external socket server (check if the server is still running)"
 					]));
 					return;
+				} else {
+					$lastReceiveTime = microtime(true);
+					foreach (explode("\0", $buffer) as $buffer) {
+						if ($buffer === "") continue;
+						$arr = json_decode($buffer, true);
+						if ($arr === null) {
+							$this->logger->debug("Could not decode data sent from the socket server");
+							continue;
+						}
+						$event = SocketEvent::get($arr);
+						if ($event instanceof UnknownEvent) {
+							$this->logger->debug("Unknown event received from the server ({$event->name})");
+						}
+						$this->receiveQueue[] = $event;
+					}
 				}
 			}
 			// now we get everything from the send queue and send stuff to the socket server
 			socket_set_block($sendSocket);
+			/** @var SocketEvent $event */
 			while (($event = $this->sendQueue->shift()) !== null) {
 				$data = (array) $event;
 				$data["name"] = $event::NAME;
-				if (@socket_write($sendSocket, json_encode($data) . self::SEPARATOR) === false) {
+				foreach ($data as $key => $value) {
+					if (is_object($value)) {
+						$data[$key] = base64_encode(serialize($value));
+					}
+				}
+				$res = @socket_write($sendSocket, json_encode($data) . self::SEPARATOR);
+				if ($res === false || $res <= 1) {
 					$this->queueReceive(new SendErrorEvent());
 				}
+			}
+			if (microtime(true) - $lastReceiveTime >= 10) {
+				$this->queueReceive(new ConnectionErrorEvent([
+					"message" => "Timed out, received no heartbeats from the server after 10 seconds"
+				]));
 			}
 			$delta = microtime(true) - $start;
 			if ($delta <= self::TPS) {
@@ -88,7 +117,6 @@ final class LumineSocketThread extends Thread {
 
 	public function send(SocketEvent $event): void {
 		$this->sendQueue[] = $event;
-		$this->notify();
 	}
 
 	public function queueReceive(SocketEvent $event): void {

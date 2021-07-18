@@ -2,12 +2,194 @@
 
 namespace ethaniccc\Lumine;
 
+use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
+use ethaniccc\Lumine\data\protocol\v428\PlayerBlockAction;
+use ethaniccc\Lumine\events\LagCompensationEvent;
+use ethaniccc\Lumine\events\PlayerSendPacketEvent;
+use ethaniccc\Lumine\events\ServerSendPacketEvent;
 use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
+use pocketmine\event\server\DataPacketSendEvent;
+use pocketmine\network\mcpe\protocol\BatchPacket;
+use pocketmine\network\mcpe\protocol\MovePlayerPacket;
+use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
+use pocketmine\network\mcpe\protocol\PacketPool;
+use pocketmine\network\mcpe\protocol\PlayerActionPacket;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
+use pocketmine\network\mcpe\protocol\StartGamePacket;
+use pocketmine\network\mcpe\protocol\types\PlayerMovementSettings;
+use pocketmine\network\mcpe\protocol\types\PlayerMovementType;
+use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
+use pocketmine\tile\Spawnable;
 
 final class PMListener implements Listener {
 
+	public bool $isLumineSentPacket = false;
+
+	private const USED_PACKETS = [
+		ProtocolInfo::SET_ACTOR_MOTION_PACKET, ProtocolInfo::UPDATE_BLOCK_PACKET
+	];
+
 	public function receive(DataPacketReceiveEvent $event): void {
+		$player = $event->getPlayer();
+		$packet = $event->getPacket();
+		if (!Lumine::getInstance()->cache->exists($player)) {
+			Lumine::getInstance()->cache->add($player);
+		}
+		$identifier = Lumine::getInstance()->cache->get($player);
+		if ($packet instanceof PlayerAuthInputPacket) {
+
+			if ($packet->blockActions !== null) {
+				foreach ($packet->blockActions as $action) {
+					$pk = new PlayerActionPacket();
+					$pk->entityRuntimeId = $player->getId();
+					switch ($action->actionType) {
+						case PlayerBlockAction::START_BREAK:
+							$pk->action = PlayerActionPacket::ACTION_START_BREAK;
+							$pk->x = $action->blockPos->x;
+							$pk->y = $action->blockPos->y;
+							$pk->z = $action->blockPos->z;
+							$pk->face = $player->getDirection();
+							$player->handlePlayerAction($pk);
+							break;
+						case PlayerBlockAction::CONTINUE:
+						case PlayerBlockAction::CRACK_BREAK:
+							$pk->action = PlayerActionPacket::ACTION_CRACK_BREAK;
+							$pk->x = $action->blockPos->x;
+							$pk->y = $action->blockPos->y;
+							$pk->z = $action->blockPos->z;
+							$pk->face = $player->getDirection();
+							$player->handlePlayerAction($pk);
+							break;
+						case PlayerBlockAction::ABORT_BREAK:
+							$pk->action = PlayerActionPacket::ACTION_ABORT_BREAK;
+							$pk->x = $action->blockPos->x;
+							$pk->y = $action->blockPos->y;
+							$pk->z = $action->blockPos->z;
+							$pk->face = $player->getDirection();
+							$player->handlePlayerAction($pk);
+							break;
+						case PlayerBlockAction::STOP_BREAK:
+							$pk->action = PlayerActionPacket::ACTION_STOP_BREAK;
+							$position = $packet->getPosition()->subtract(0, 1.62);
+							$pk->x = $position->x;
+							$pk->y = $position->y;
+							$pk->z = $position->z;
+							$pk->face = $player->getDirection();
+							$player->handlePlayerAction($pk);
+							break;
+						case PlayerBlockAction::PREDICT_DESTROY:
+							break;
+					}
+				}
+			}
+
+			if ($packet->itemInteractionData !== null) {
+				// maybe if :microjang: didn't make the block breaking server-side option redundant, I wouldn't be doing this... you know who to blame !
+				// hahaha... skidding PMMP go brrrt
+				$player->doCloseInventory();
+				$item = $player->getInventory()->getItemInHand();
+				$oldItem = clone $item;
+				$currentBlock = $player->getLevel()->getBlock($packet->itemInteractionData->blockPos);
+				$canInteract = $player->canInteract($packet->itemInteractionData->blockPos->add(0.5, 0.5, 0.5), $player->isCreative() ? 13 : 7);
+				$useBreakOn = $player->getLevel()->useBreakOn($packet->itemInteractionData->blockPos, $item, $player, true);
+				if ($canInteract and $useBreakOn) {
+					if ($player->isSurvival()) {
+						if (!$item->equalsExact($oldItem) and $oldItem->equalsExact($player->getInventory()->getItemInHand())) {
+							$player->getInventory()->setItemInHand($item);
+							$player->getInventory()->sendHeldItem($player->getViewers());
+						}
+					}
+				} else {
+					$player->getInventory()->sendContents($player);
+					$player->getInventory()->sendHeldItem($player);
+					$target = $player->getLevel()->getBlock($packet->itemInteractionData->blockPos);
+					$blocks = $target->getAllSides();
+					$blocks[] = $target;
+					$player->getLevel()->sendBlocks([$player], $blocks, UpdateBlockPacket::FLAG_ALL_PRIORITY);
+					foreach ($blocks as $b) {
+						$tile = $player->getLevel()->getTile($b);
+						if ($tile instanceof Spawnable) {
+							$tile->spawnTo($player);
+						}
+					}
+				}
+			}
+
+			$pk = new MovePlayerPacket();
+			$pk->entityRuntimeId = $player->getId();
+			$pk->position = $packet->getPosition();
+			$pk->yaw = $packet->getYaw();
+			$pk->headYaw = $packet->getHeadYaw();
+			$pk->pitch = $packet->getPitch();
+			$pk->mode = MovePlayerPacket::MODE_NORMAL;
+			$pk->onGround = true;
+			$pk->tick = $packet->getTick();
+			$player->handleMovePlayer($pk);
+		}
+		if (!$packet instanceof BatchPacket) {
+			Lumine::getInstance()->socketThread->send(new PlayerSendPacketEvent([
+				"identifier" => $identifier,
+				"packet" => $packet,
+				"timestamp" => microtime(true)
+			]));
+		}
+	}
+
+	public function send(DataPacketSendEvent $event): void {
+		$packet = $event->getPacket();
+		$player = $event->getPlayer();
+		if (!Lumine::getInstance()->cache->exists($player)) {
+			Lumine::getInstance()->cache->add($player);
+		}
+		$identifier = Lumine::getInstance()->cache->get($player);
+		if ($this->isLumineSentPacket) {
+			$this->isLumineSentPacket = false;
+			return;
+		}
+
+		if ($packet instanceof StartGamePacket) {
+			$packet->playerMovementSettings = new PlayerMovementSettings(
+				PlayerMovementType::SERVER_AUTHORITATIVE_V2_REWIND,
+				0,
+				false // as if this even matters *cough*
+			);
+		} elseif ($packet instanceof BatchPacket) {
+			if ($packet->getCompressionLevel() > 0) {
+				$packet->decode();
+			}
+			foreach ($packet->getPackets() as $buffer) {
+				$pk = PacketPool::getPacket($buffer);
+				if (in_array($pk->pid(), self::USED_PACKETS, true)) {
+					$pk->decode();
+					$compensation = new BatchPacket();
+					$compensation->setCompressionLevel(0);
+					$var1 = new NetworkStackLatencyPacket();
+					$var1->timestamp = mt_rand(1, 10000000000) * 1000;
+					$var1->needResponse = true;
+					$compensation->addPacket($var1);
+					$compensation->addPacket($pk);
+					Lumine::getInstance()->socketThread->send(new LagCompensationEvent([
+						"identifier" => $identifier,
+						"timestamp" => $var1->timestamp,
+						"packet" => $pk
+					]));
+					$this->isLumineSentPacket = true;
+					$player->dataPacket($compensation);
+				}
+			}
+			Lumine::getInstance()->socketThread->send(new ServerSendPacketEvent([
+				"identifier" => $identifier,
+				"packet" => $packet,
+				"timestamp" => microtime(true)
+			]));
+		}
+	}
+
+	public function quit(PlayerQuitEvent $event): void {
+		Lumine::getInstance()->cache->remove($event->getPlayer());
 	}
 
 }

@@ -5,6 +5,7 @@ namespace ethaniccc\Lumine\tasks;
 use ethaniccc\Lumine\events\ConnectionErrorEvent;
 use ethaniccc\Lumine\events\HeartbeatEvent;
 use ethaniccc\Lumine\events\SendErrorEvent;
+use ethaniccc\Lumine\events\ServerSendPacketEvent;
 use ethaniccc\Lumine\events\SocketEvent;
 use ethaniccc\Lumine\Lumine;
 use pocketmine\scheduler\Task;
@@ -26,6 +27,12 @@ final class TickingTask extends Task {
 				Lumine::getInstance()->getLogger()->error("Unable to send an event to the remote server.");
 				Server::getInstance()->getPluginManager()->disablePlugin(Lumine::getInstance());
 				return;
+			} elseif ($event instanceof ServerSendPacketEvent) {
+				$player = Lumine::getInstance()->cache->identify($event->identifier);
+				if ($player !== null) {
+					Lumine::getInstance()->listener->isLumineSentPacket = true;
+					$player->dataPacket($event->packet);
+				}
 			}
 		}
 	}

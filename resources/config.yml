@@ -19,4 +19,4 @@ prefix: "§l§8[§5Lum§dine§8]"
 
 socket_server:
   address: "127.0.0.1"
-  port: 3000
+  port: 3001
