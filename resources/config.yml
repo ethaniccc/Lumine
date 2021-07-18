@@ -1,0 +1,19 @@
+#     __                               __
+#    |  \                             |  \
+#    | $$      __    __  ______ ____   \$$ _______    ______
+#    | $$     |  \  |  \|      \    \ |  \|       \  /      \
+#    | $$     | $$  | $$| $$$$$$\$$$$\| $$| $$$$$$$\|  $$$$$$\
+#    | $$     | $$  | $$| $$ | $$ | $$| $$| $$  | $$| $$    $$
+#    | $$_____| $$__/ $$| $$ | $$ | $$| $$| $$  | $$| $$$$$$$$
+#    | $$     \\$$    $$| $$ | $$ | $$| $$| $$  | $$ \$$     \
+#     \$$$$$$$$ \$$$$$$  \$$  \$$  \$$ \$$ \$$   \$$  \$$$$$$$
+#
+#  Created by ethaniccc @ https://www.github.com/ethaniccc
+# ------------------------------------------------------------------------------
+#  Copyright (C) ethaniccc - All Rights Reserved
+#  Unauthorized copying of this file, via any medium is strictly prohibited
+#  Proprietary and confidential
+#  Written by Benjamin <schooldocumentsandstuff@gmail.com> on July, 2021
+
+server_port: 3001
+memory_limit: 2048M

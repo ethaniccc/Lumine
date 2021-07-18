@@ -1,0 +1,12 @@
+{
+  "name": "ethaniccc/lumine-server",
+  "description": "A socket server for the Lumine anticheat plugin",
+  "type": "project",
+  "require": {
+    "pocketmine/pocketmine-mp": "^3.22",
+    "ext-sockets": "*",
+    "ext-pthreads": "*",
+    "ext-yaml": "*",
+    "ext-json": "*"
+  }
+}

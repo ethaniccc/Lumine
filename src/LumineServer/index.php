@@ -1,0 +1,22 @@
+<?php
+
+namespace LumineServer {
+
+	function server(): void {
+		require_once "./vendor/autoload.php";
+		spl_autoload_register (function ($class) {
+			$class = str_replace ("\\", DIRECTORY_SEPARATOR, $class);
+			if (!is_file ("src/$class.php")) {
+				throw new \LogicException ("Class $class not found");
+			} else {
+				require_once "src/$class.php";
+			}
+		});
+		$server = new Server();
+		$server->run();
+	}
+
+	ignore_user_abort(true);
+	\LumineServer\server();
+
+}
