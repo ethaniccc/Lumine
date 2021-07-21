@@ -15,7 +15,11 @@ use LumineServer\events\SocketEvent;
 use LumineServer\events\UnknownEvent;
 use LumineServer\Server;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
+use pocketmine\network\mcpe\NetworkBinaryStream;
 use pocketmine\network\mcpe\protocol\BatchPacket;
+use pocketmine\utils\BinaryDataException;
+use pocketmine\utils\BinaryStream;
+use ReflectionClass;
 
 final class SocketHandler {
 
@@ -25,6 +29,12 @@ final class SocketHandler {
 	public $socket;
 	/** @var resource */
 	public $targetClient;
+
+	public bool $isAwaitingBuffer = false;
+	public int $toRead = 4;
+	/** @var string */
+	public $wholeBuffer = "";
+
 
 	public function __construct(int $port) {
 		$this->port = $port;
@@ -54,83 +64,94 @@ final class SocketHandler {
 		if ($this->targetClient === null) {
 			goto end;
 		}
-		$buffer = "";
-		while (true) {
-			$current = @socket_read($this->targetClient, 1024);
-			if ($current === false) {
-				if ($buffer !== "") {
-					goto did_something_go_wrong;
-					/* Server::getInstance()->logger->log("Unexpected non empty buffer when read was false - shutting down server...");
-					Server::getInstance()->shutdown();
-					return; */
-				}
-				goto end;
-			}
-			$buffer .= $current;
-			if (strlen($buffer) % 1024 !== 0 || $current === "") {
-				did_something_go_wrong:
-				$this->lastSend = microtime(true);
-				break;
-			}
-		}
-		if ($buffer === "") {
+		retry_read:
+		$current = @socket_read($this->targetClient, $this->toRead);
+		if ($current === "") {
 			Server::getInstance()->logger->log("Closed connection (client disconnect)");
 			$toRemove = true;
+		} elseif ($current === false) {
 			goto end;
+		} else {
+			$this->lastSend = microtime(true);
+			$length = strlen($current);
+			if ($this->isAwaitingBuffer) {
+				$this->wholeBuffer .= $current;
+				if ($length !== $this->toRead) {
+					$this->toRead -= strlen($current);
+				} else {
+					$decoded = json_decode($this->wholeBuffer, true);
+					if ($decoded === false) {
+						Server::getInstance()->logger->log("Unable to decode JSON data");
+					} else {
+						$event = SocketEvent::get($decoded);
+						if ($event instanceof HeartbeatEvent) {
+							$this->send(new HeartbeatEvent());
+						} elseif ($event instanceof AddUserDataEvent) {
+							Server::getInstance()->dataStorage->add($event->identifier);
+							Server::getInstance()->logger->log("Added user data for {$event->identifier}");
+						} elseif ($event instanceof RemoveUserDataEvent) {
+							Server::getInstance()->dataStorage->remove($event->identifier);
+							Server::getInstance()->logger->log("Removed user data for {$event->identifier}");
+						} elseif ($event instanceof ResetDataEvent) {
+							Server::getInstance()->dataStorage->reset();
+							Server::getInstance()->logger->log("Server requested for data removal - request accepted");
+						} elseif ($event instanceof PlayerSendPacketEvent) {
+							$data = Server::getInstance()->dataStorage->get($event->identifier);
+							if ($data === null) {
+								Server::getInstance()->logger->log("Received a player send packet event for {$event->identifier}, but no data was found.");
+								goto finish_read;
+							}
+							$data->handler->inbound($event->packet, $event->timestamp);
+						} elseif ($event instanceof ServerSendPacketEvent) {
+							$data = Server::getInstance()->dataStorage->get($event->identifier);
+							if ($data === null) {
+								Server::getInstance()->logger->log("Received a server send packet event for {$event->identifier}, but no data was found.");
+								goto finish_read;
+							}
+							$data->handler->outbound($event->packet, $event->timestamp);
+						} elseif ($event instanceof LagCompensationEvent) {
+							$data = Server::getInstance()->dataStorage->get($event->identifier);
+							if ($data === null) {
+								Server::getInstance()->logger->log("Received a server send packet event for {$event->identifier}, but no data was found.");
+								goto finish_read;
+							}
+							$data->handler->compensate($event);
+						} elseif ($event instanceof InitDataEvent) {
+							if ($event->extraData["bedrockKnownStates"]) {
+								$reflection = new ReflectionClass(RuntimeBlockMapping::class);
+								$reflection->setStaticPropertyValue("bedrockKnownStates", unserialize($event->extraData["bedrockKnownStates"]));
+								$reflection->setStaticPropertyValue("runtimeToLegacyMap", unserialize($event->extraData["runtimeToLegacyMap"]));
+								$reflection->setStaticPropertyValue("legacyToRuntimeMap", unserialize($event->extraData["legacyToRuntimeMap"]));
+								Server::getInstance()->logger->log("RuntimeBlockMapping was initialized");
+							}
+						} elseif ($event instanceof UnknownEvent) {
+							Server::getInstance()->logger->log("Got unknown event ({$event->name})");
+						}
+					}
+					finish_read:
+					$this->toRead = 4;
+					$this->isAwaitingBuffer = false;
+					$this->wholeBuffer = null;
+					$this->wholeBuffer = "";
+				}
+				goto retry_read;
+			} else {
+				$unpacked = unpack("l", $current)[1];
+				$this->toRead = $unpacked;
+				$this->isAwaitingBuffer = true;
+				goto retry_read;
+			}
 		}
-		foreach (explode("\0", $buffer) as $buffer) {
-			if (strlen($buffer) === 0) {
-				continue;
-			}
-			$decoded = json_decode($buffer, true);
-			if ($decoded === null) {
-				Server::getInstance()->logger->log("Unable to decode JSON data");
-				$this->send(new SendErrorEvent());
-				continue;
-			}
-			$event = SocketEvent::get($decoded);
-			if ($event instanceof HeartbeatEvent) {
-				$this->send(new HeartbeatEvent());
-			} elseif ($event instanceof AddUserDataEvent) {
-				Server::getInstance()->dataStorage->add($event->identifier);
-				Server::getInstance()->logger->log("Added user data for {$event->identifier}");
-			} elseif ($event instanceof RemoveUserDataEvent) {
-				Server::getInstance()->dataStorage->remove($event->identifier);
-				Server::getInstance()->logger->log("Removed user data for {$event->identifier}");
-			} elseif ($event instanceof ResetDataEvent) {
-				Server::getInstance()->dataStorage->reset();
-				Server::getInstance()->logger->log("Server requested for data removal - request accepted");
-			} elseif ($event instanceof PlayerSendPacketEvent) {
-				$data = Server::getInstance()->dataStorage->get($event->identifier);
-				if ($data === null) {
-					Server::getInstance()->logger->log("Received a player send packet event for {$event->identifier}, but no data was found.");
+		if (isset($stream)) {
+			$eventCount = $stream->getUnsignedVarInt();
+			for ($i = 0; $i < $eventCount; $i++) {
+				$eventData = $stream->getString();
+				$decoded = json_decode($eventData, true);
+				if ($decoded === null) {
+					Server::getInstance()->logger->log("Unable to decode JSON data");
+					$this->send(new SendErrorEvent());
 					continue;
 				}
-				$data->handler->inbound($event->packet, $event->timestamp);
-			} elseif ($event instanceof ServerSendPacketEvent) {
-				$data = Server::getInstance()->dataStorage->get($event->identifier);
-				if ($data === null) {
-					Server::getInstance()->logger->log("Received a server send packet event for {$event->identifier}, but no data was found.");
-					continue;
-				}
-				$data->handler->outbound($event->packet, $event->timestamp);
-			} elseif ($event instanceof LagCompensationEvent) {
-				$data = Server::getInstance()->dataStorage->get($event->identifier);
-				if ($data === null) {
-					Server::getInstance()->logger->log("Received a server send packet event for {$event->identifier}, but no data was found.");
-					continue;
-				}
-				$data->handler->compensate($event);
-			} elseif ($event instanceof InitDataEvent) {
-				if ($event->extraData["bedrockKnownStates"]) {
-					$reflection = new \ReflectionClass(RuntimeBlockMapping::class);
-					$reflection->setStaticPropertyValue("bedrockKnownStates", unserialize($event->extraData["bedrockKnownStates"]));
-					$reflection->setStaticPropertyValue("runtimeToLegacyMap", unserialize($event->extraData["runtimeToLegacyMap"]));
-					$reflection->setStaticPropertyValue("legacyToRuntimeMap", unserialize($event->extraData["legacyToRuntimeMap"]));
-					Server::getInstance()->logger->log("RuntimeBlockMapping was initialized");
-				}
-			} elseif ($event instanceof UnknownEvent) {
-				Server::getInstance()->logger->log("Got unknown event ({$event->name})");
 			}
 		}
 		end:
@@ -184,11 +205,14 @@ final class SocketHandler {
 				$data[$key] = base64_encode(serialize($value));
 			}
 		}
-		if (@socket_write($this->targetClient, json_encode($data) . "\0") === false) {
-			Server::getInstance()->logger->log("Unable to send an event to the target client - closing connection");
+		$write = json_encode($data);
+		$res = @socket_write($this->targetClient, pack("l", strlen($write)) . $write);
+		if ($res === false) {
 			socket_close($this->targetClient);
 			$this->targetClient = null;
-			$this->lastSend = 0;
+			Server::getInstance()->logger->log("Unable to send event to the remove server - closed connection");
+		} else {
+			$data = null;
 		}
 	}
 

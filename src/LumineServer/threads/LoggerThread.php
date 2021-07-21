@@ -41,9 +41,13 @@ class LoggerThread extends \Thread {
 		$this->notify();
 	}
 
-	public function log(string $data): void {
-		$this->buffer[] = $data;
-		$this->notify();
+	public function log(string $data, bool $write = true): void {
+		if ($write) {
+			$this->buffer[] = $data;
+			$this->notify();
+		} else {
+			echo "[LumineServer] $data\n";
+		}
 	}
 
 	private function writeStream($stream): void {

@@ -8,6 +8,7 @@ use LumineServer\data\UserData;
 use LumineServer\data\world\NetworkChunkDeserializer;
 use LumineServer\events\LagCompensationEvent;
 use LumineServer\events\SocketEvent;
+use LumineServer\Server;
 use LumineServer\utils\AABB;
 use LumineServer\utils\LevelUtils;
 use pocketmine\block\Block;
