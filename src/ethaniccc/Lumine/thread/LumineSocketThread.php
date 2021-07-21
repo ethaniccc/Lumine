@@ -3,22 +3,27 @@
 namespace ethaniccc\Lumine\thread;
 
 use ethaniccc\Lumine\events\ConnectionErrorEvent;
+use ethaniccc\Lumine\events\HeartbeatEvent;
 use ethaniccc\Lumine\events\SendErrorEvent;
 use ethaniccc\Lumine\events\SocketEvent;
 use ethaniccc\Lumine\events\UnknownEvent;
 use ethaniccc\Lumine\Settings;
-use pocketmine\network\mcpe\protocol\MovePlayerPacket;
+use pocketmine\network\mcpe\NetworkBinaryStream;
 use pocketmine\Thread;
+use pocketmine\utils\BinaryDataException;
+use pocketmine\utils\BinaryStream;
 
 final class LumineSocketThread extends Thread {
 
-	public const SEPARATOR = "\0";
-	public const TPS = 1 / 50;
+	public const TPS = 1 / 40;
 
 	public \AttachableThreadedLogger $logger;
 	public \Threaded $sendQueue;
 	public \Threaded $receiveQueue;
 	public Settings $settings;
+
+	public bool $isAwaitingBuffer = false;
+	public int $toRead = 4;
 
 	public function __construct(Settings $settings, \AttachableThreadedLogger $logger) {
 		$this->setClassLoader();
@@ -31,57 +36,54 @@ final class LumineSocketThread extends Thread {
 	public function run(): void {
 		$this->registerClassLoader();
 		$lastReceiveTime = microtime(true);
-		$sendSocket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 		/** @var Settings $serverSettings */
 		$serverSettings = $this->settings->get("socket_server", new Settings([
 			"address" => "127.0.0.1",
 			"port" => 3001
 		]));
-		if (!@socket_connect($sendSocket, $serverSettings->get("address", "0.0.0.0"), $serverSettings->get("port", 3001))) {
+		$sendSocket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+		if (!@socket_connect($sendSocket, $serverSettings->get("address", "127.0.0.1"), $serverSettings->get("port", 3001))) {
 			$this->queueReceive(new ConnectionErrorEvent(["message" => "Unable to establish first connection to the server. Check that the server is online."]));
 			return;
 		}
 		while (!$this->isKilled) {
 			$start = microtime(true);
-			// first, we read from the receive socket, then go on to sending stuff from the sendQueue
 			socket_set_nonblock($sendSocket);
 			$buffer = "";
-			$hasBuffer = true;
-			while (true) {
-				$current = @socket_read($sendSocket, 1024);
-				if ($current === false) { // the buffer was empty, the PMMP server has not received anything from the socket server
-					if ($buffer !== "") {
-						exit("Unexpected non-empty current buffer");
+			retry_read:
+			$current = @socket_read($sendSocket, $this->toRead);
+			if ($current === "") {
+				$this->queueReceive(new ConnectionErrorEvent([
+					"message" => "Unable to read buffer from the external socket server (check if the server is still running)"
+				]));
+				return;
+			} elseif ($current !== false) {
+				$lastReceiveTime = microtime(true);
+				$length = strlen($current);
+				if ($this->isAwaitingBuffer) {
+					$buffer .= $current;
+					if ($length !== $this->toRead) {
+						$this->toRead -= $length;
+					} else {
+						$decoded = json_decode($buffer, true);
+						if ($decoded === false) {
+							$this->queueReceive(new ConnectionErrorEvent([
+								"message" => "Unable to decode JSON data"
+							]));
+							goto end;
+						}
+						$event = SocketEvent::get($decoded);
+						$this->queueReceive($event);
+						$buffer = "";
+						$this->toRead = 4;
+						$this->isAwaitingBuffer = false;
+						goto retry_read;
 					}
-					$hasBuffer = false;
-					break;
-				}
-				$buffer .= $current;
-				if (strlen($buffer) % 1024 !== 0 || $current === "") {
-					break;
-				}
-			}
-			if ($hasBuffer) {
-				if ($buffer === "") {
-					$this->queueReceive(new ConnectionErrorEvent([
-						"message" => "Unable to read buffer from the external socket server (check if the server is still running)"
-					]));
-					return;
 				} else {
-					$lastReceiveTime = microtime(true);
-					foreach (explode("\0", $buffer) as $buffer) {
-						if ($buffer === "") continue;
-						$arr = json_decode($buffer, true);
-						if ($arr === null) {
-							$this->logger->debug("Could not decode data sent from the socket server");
-							continue;
-						}
-						$event = SocketEvent::get($arr);
-						if ($event instanceof UnknownEvent) {
-							$this->logger->debug("Unknown event received from the server ({$event->name})");
-						}
-						$this->receiveQueue[] = $event;
-					}
+					$unpacked = unpack("l", $current)[1];
+					$this->toRead = $unpacked;
+					$this->isAwaitingBuffer = true;
+					goto retry_read;
 				}
 			}
 			// now we get everything from the send queue and send stuff to the socket server
@@ -95,8 +97,9 @@ final class LumineSocketThread extends Thread {
 						$data[$key] = base64_encode(serialize($value));
 					}
 				}
-				$res = @socket_write($sendSocket, json_encode($data) . self::SEPARATOR);
-				if ($res === false || $res <= 1) {
+				$write = json_encode($data);
+				$res = @socket_write($sendSocket, pack("l", strlen($write)) . $write);
+				if ($res === false) {
 					$this->queueReceive(new SendErrorEvent());
 				}
 			}
@@ -112,6 +115,7 @@ final class LumineSocketThread extends Thread {
 				$this->logger->debug("Thread running to slow - catching up (delta=$delta)");
 			}
 		}
+		end:
 		socket_close($sendSocket);
 	}
 
