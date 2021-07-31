@@ -3,9 +3,11 @@
 namespace LumineServer;
 
 use LumineServer\data\DataStorage;
+use LumineServer\detections\DetectionModule;
 use LumineServer\socket\SocketHandler;
 use LumineServer\threads\CommandThread;
 use LumineServer\threads\LoggerThread;
+use LumineServer\utils\MCMathHelper;
 use pocketmine\block\BlockFactory;
 use pocketmine\item\ItemFactory;
 use pocketmine\network\mcpe\protocol\PacketPool;
@@ -44,7 +46,9 @@ final class Server {
 	}
 
 	public function run(): void {
+		$start = microtime(true);
 		$this->logger->start(PTHREADS_INHERIT_NONE);
+		$this->logger->log("Started up logger thread");
 
 		$consoleNotifier = new SleeperNotifier();
 		$this->console = new CommandThread($consoleNotifier);
@@ -66,12 +70,20 @@ final class Server {
 			}
 		});
 		$this->console->start(PTHREADS_INHERIT_NONE);
+		$this->logger->log("Command input thread started");
+
 		$this->socketHandler->start();
+		$this->logger->log("Socket handler started");
+
 		PacketPool::init();
 		ItemFactory::init();
 		BlockFactory::init();
+		DetectionModule::init();
+		MCMathHelper::init();
+		$this->logger->log("Initialized needed data");
 		ini_set("memory_limit", $this->settings->get("memory_limit", "1024M"));
-		$this->logger->log("Lumine server has started");
+		$time = round(microtime(true) - $start, 4);
+		$this->logger->log("Lumine server has started in $time seconds");
 
 		while ($this->running) {
 			++$this->currentTick;

@@ -2,7 +2,10 @@
 
 namespace LumineServer\data\handler;
 
+use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
+use LumineServer\data\effect\EffectData;
+use LumineServer\data\effect\ExtraEffectIds;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\UserData;
 use LumineServer\data\world\NetworkChunkDeserializer;
@@ -19,6 +22,8 @@ use pocketmine\block\Ladder;
 use pocketmine\block\Liquid;
 use pocketmine\block\UnknownBlock;
 use pocketmine\block\Vine;
+use pocketmine\entity\Effect;
+use pocketmine\level\Level;
 use pocketmine\level\Location;
 use pocketmine\level\Position;
 use pocketmine\math\Vector3;
@@ -27,6 +32,7 @@ use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
 use pocketmine\network\mcpe\protocol\LevelChunkPacket;
+use pocketmine\network\mcpe\protocol\MobEffectPacket;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\NetworkChunkPublisherUpdatePacket;
 use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
@@ -43,7 +49,7 @@ final class PacketHandler {
 
 	private const USED_PACKETS = [
 		ProtocolInfo::LEVEL_CHUNK_PACKET, ProtocolInfo::NETWORK_CHUNK_PUBLISHER_UPDATE_PACKET, ProtocolInfo::NETWORK_STACK_LATENCY_PACKET,
-		ProtocolInfo::UPDATE_BLOCK_PACKET
+		ProtocolInfo::UPDATE_BLOCK_PACKET,
 	];
 
 	public function __construct(UserData $data) {
@@ -56,6 +62,41 @@ final class PacketHandler {
 			if ($packet->itemInteractionData !== null) {
 				$data->world->setBlock($packet->itemInteractionData->blockPos, 0, 0);
 			}
+
+			if (InputConstants::hasFlag($packet, InputConstants::START_SNEAKING)) {
+				$data->isSneaking = true;
+			} elseif (InputConstants::hasFlag($packet, InputConstants::STOP_SNEAKING)) {
+				$data->isSneaking = false;
+			}
+
+			if (InputConstants::hasFlag($packet, InputConstants::START_SPRINTING)) {
+				$data->isSprinting = true;
+			} elseif (InputConstants::hasFlag($packet, InputConstants::STOP_SPRINTING)) {
+				$data->isSprinting = false;
+			}
+
+			if (InputConstants::hasFlag($packet, InputConstants::START_JUMPING)) {
+				$data->isJumping = true;
+			} else {
+				$data->isJumping = false;
+			}
+
+			foreach ($data->effects as $effectData) {
+				$effectData->ticks--;
+				if ($effectData->ticks <= 0) {
+					unset($data->effects[$effectData->effectId]);
+				} else {
+					switch ($effectData->effectId) {
+						case Effect::JUMP_BOOST:
+							$data->jumpVelocity = MovementConstants::DEFAULT_JUMP_MOTION + ($effectData->amplifier / 10);
+							break;
+						case ExtraEffectIds::SLOW_FALLING:
+							$data->gravity = MovementConstants::SLOW_FALLING_GRAVITY;
+							break;
+					}
+				}
+			}
+
 			$data->lastPos = clone $data->currentPos;
 			unset($data->currentPos);
 			$data->currentPos = Location::fromObject($packet->getPosition()->subtract(0, 1.62), null, $packet->getYaw(), $packet->getPitch());
@@ -64,97 +105,33 @@ final class PacketHandler {
 			$data->motion = $data->currentPos->subtract($data->lastPos)->asVector3();
 			unset($data->boundingBox);
 			$data->boundingBox = AABB::fromPosition($data->currentPos, $data->hitboxWidth, $data->hitboxHeight);
-			$data->isInLoadedChunk = $data->world->isValidChunk(floor($data->currentPos->x) >> 4, floor($data->currentPos->z) >> 4);
+			$data->isInLoadedChunk = $data->world->isValidChunk(Level::chunkHash(floor($data->currentPos->x) >> 4, floor($data->currentPos->z) >> 4));
 
 			$data->isInVoid = $data->currentPos->y <= -35;
 			$data->ghostBlockHandler->updateSuspected();
 
-			if (!$data->isInLoadedChunk || $data->isInVoid) {
-				$data->onGround = true;
-				$data->expectedOnGround = true;
-				$data->isCollidedVertically = false;
-				$data->isCollidedVertically = false;
-			} else {
-				$data->expectedOnGround = false;
-				$data->isCollidedVertically = false;
-				$data->isCollidedVertically = false;
-				$data->lastBlocksBelow = $data->blocksBelow;
-				unset($data->blocksBelow);
-				$data->blocksBelow = [];
-
-				$liquids = 0;
-				$climbable = 0;
-				$cobweb = 0;
-
-				$floorPos = $data->currentPos->floor();
-				$AABB = $data->boundingBox->expandedCopy(0.2, MovementConstants::GROUND_MODULO, 0.2);
-				$verticalAABB = $data->boundingBox->expandedCopy(0, MovementConstants::GROUND_MODULO, 0);
-				$horizontalAABB = $data->boundingBox->expandedCopy(0.2, 0, 0.2);
-				$blocks = LevelUtils::checkBlocksInAABB($AABB, $data->world, LevelUtils::SEARCH_ALL);
-				foreach ($blocks as $block) {
-					/** @var Block $block */
-					if (!$data->isCollidedHorizontally) {
-						// snow layers are evil
-						$data->isCollidedHorizontally = $block->getId() !== BlockIds::AIR && (count($block->getCollisionBoxes()) === 0 ? AABB::fromBlock($block)->intersectsWith($horizontalAABB) : $block->collidesWithBB($horizontalAABB));
-					}
-					if ($block->getId() !== BlockIds::AIR && (count($block->getCollisionBoxes()) === 0 ? AABB::fromBlock($block)->intersectsWith($verticalAABB) : $block->collidesWithBB($verticalAABB))) {
-						$data->isCollidedVertically = true;
-						if (floor($block->y) <= $floorPos->y) {
-							$data->expectedOnGround = true;
-							$data->blocksBelow[] = $block;
-						} else {
-							$hasAbove = true;
-						}
-					}
-					if ($block instanceof Liquid) {
-						$liquids++;
-					} elseif ($block instanceof Cobweb) {
-						$cobweb++;
-					} elseif ($block instanceof Ladder || $block instanceof Vine) {
-						$climbable++;
-					}
-				}
-
-				$liquids > 0 ?
-					$data->ticksSinceInLiquid = 0 :
-					$data->ticksSinceInLiquid++;
-				$cobweb > 0 ?
-					$data->ticksSinceInCobweb = 0 :
-					$data->ticksSinceInCobweb++;
-				$climbable > 0 ?
-					$data->ticksSinceInClimbable = 0 :
-					$data->ticksSinceInClimbable++;
-
-				$predictedY = $data->clientPrediction->y;
-				$var1 = abs($data->motion->y - $predictedY) > 0.001;
-				$var2 = $predictedY < 0 || $data->isCollidedHorizontally;
-				$data->hasCollisionAbove = $var1 && $predictedY > 0 && abs($predictedY) > 0.005 && isset($hasAbove);
-				$data->onGround = $var1 && $var2 && $data->expectedOnGround;
-				if (!$data->onGround && ($determinedGhostBlocks = $data->ghostBlockHandler->determine()) !== null) {
-					foreach ($determinedGhostBlocks as $block) {
-						$pk = new UpdateBlockPacket();
-						$pk->blockRuntimeId = $block->getRuntimeId();
-						$pk->x = $block->x;
-						$pk->y = $block->y;
-						$pk->z = $block->z;
-						$pk->flags = UpdateBlockPacket::FLAG_ALL;
-						$pk->dataLayerId = ($block instanceof Liquid ? UpdateBlockPacket::DATA_LAYER_LIQUID : UpdateBlockPacket::DATA_LAYER_NORMAL);
-						if (floor($block->y) <= $floorPos->y) {
-							$data->teleport($block->add(0.5, 0, 0.5));
-						}
-						$data->latencyManager->sandwich(function () use ($data, $block): void {
-							$data->world->setBlock($block->asVector3(), $block->getId(), $block->getDamage());
-							$data->ghostBlockHandler->unsuspect($block);
-						}, $pk);
-					}
-				}
+			$data->moveForward = $packet->getMoveVecZ() * 0.98;
+			$data->moveStrafe = $packet->getMoveVecX() * 0.98;
+			$data->movementSpeed = 0.1;
+			$speed = $data->effects[Effect::SPEED] ?? null;
+			if ($speed !== null) {
+				$data->movementSpeed += (0.02 * $speed->amplifier);
 			}
+			$slowness = $data->effects[Effect::SLOWNESS] ?? null;
+			if ($slowness !== null) {
+				$data->movementSpeed -= (0.015 * $slowness->amplifier); // TODO: Correctly account when both slowness and speed effects are applied
+			}
+			if ($data->isSprinting) {
+				$data->movementSpeed *= 1.3;
+			}
+			$data->movementSpeed = max(0, $data->movementSpeed); // TODO: Account for de-sync that seems to happen in PMMP after removing slowness effect and having 0 movement speed
+
+			$data->movementPredictionHandler->execute();
 
 			unset($data->clientPrediction);
 			$data->clientPrediction = $packet->getDelta();
 
-			$data->moveForward = $packet->getMoveVecZ() * 0.98;
-			$data->moveStrafe = $packet->getMoveVecX() * 0.98;
+			$data->isTeleporting = false;
 
 			$data->ticksSinceMotion++;
 			if ($data->onGround) {
@@ -195,6 +172,12 @@ final class PacketHandler {
 				}
 			}
 		}
+
+		foreach ($data->detections as $detection) {
+			if ($detection->enabled) {
+				$detection->run($packet);
+			}
+		}
 	}
 
 	public function outbound(BatchPacket $packet, float $timestamp): void {
@@ -215,19 +198,53 @@ final class PacketHandler {
 					}
 				} elseif ($pk instanceof NetworkChunkPublisherUpdatePacket) {
 					$data->latencyManager->sandwich(function () use ($data, $pk): void {
-						$chunkSendPosition = new Vector3($pk->x, $pk->y, $pk->z);
-						$radius = $pk->radius >> 4;
-						$chunkX = $chunkSendPosition->x >> 4;
-						$chunkZ = $chunkSendPosition->z >> 4;
-						$toRemove = [];
-						foreach ($data->world->getAllChunks() as $hash => $chunk) {
-							if (abs($chunk->getX() - $chunkX) >= $radius || abs($chunk->getZ() - $chunkZ) >= $radius) {
-								$toRemove[] = $hash;
+						$toRemove = $data->world->getAllChunks();
+						$centerX = $pk->x >> 4;
+						$centerZ = $pk->z >> 4;
+						$radius = $pk->radius / 16;
+						for ($x = 0; $x < $radius; ++$x) {
+							for ($z = 0; $z <= $x; ++$z) {
+								if (($x ** 2 + $z ** 2) > $radius ** 2) {
+									break;
+								}
+								$index = Level::chunkHash($centerX + $x, $centerZ + $z);
+								if ($data->world->isValidChunk($index)) {
+									unset($toRemove[$index]);
+								}
+								$index = Level::chunkHash($centerX - $x - 1, $centerZ + $z);
+								if ($data->world->isValidChunk($index)) {
+									unset($toRemove[$index]);
+								}
+								$index = Level::chunkHash($centerX + $x, $centerZ - $z - 1);
+								if ($data->world->isValidChunk($index)) {
+									unset($toRemove[$index]);
+								}
+								$index = Level::chunkHash($centerX - $x - 1, $centerZ - $z - 1);
+								if ($data->world->isValidChunk($index)) {
+									unset($toRemove[$index]);
+								}
+								if ($x !== $z) {
+									$index = Level::chunkHash($centerX + $z, $centerZ + $x);
+									if ($data->world->isValidChunk($index)) {
+										unset($toRemove[$index]);
+									}
+									$index = Level::chunkHash($centerX - $z - 1, $centerZ + $x);
+									if ($data->world->isValidChunk($index)) {
+										unset($toRemove[$index]);
+									}
+									$index = Level::chunkHash($centerX + $z, $centerZ - $x - 1);
+									if ($data->world->isValidChunk($index)) {
+										unset($toRemove[$index]);
+									}
+									$index = Level::chunkHash($centerX - $z - 1, $centerZ - $x - 1);
+									if ($data->world->isValidChunk($index)) {
+										unset($toRemove[$index]);
+									}
+								}
 							}
 						}
-						// remove chunks after there are no more references to them
-						foreach ($toRemove as $chunkHash) {
-							$data->world->removeChunkByHash($chunkHash);
+						foreach (array_keys($toRemove) as $hash) {
+							$data->world->removeChunkByHash($hash);
 						}
 					}, $pk);
 				} elseif ($pk instanceof UpdateBlockPacket) {
@@ -245,7 +262,7 @@ final class PacketHandler {
 	public function compensate(LagCompensationEvent $event): void {
 		$data = $this->data;
 		$packet = $event->packet;
-		if ($packet instanceof SetActorMotionPacket) {
+		if ($packet instanceof SetActorMotionPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {
 			$data->latencyManager->add($event->timestamp, function () use ($data, $packet): void {
 				$data->serverSentMotion = $packet->motion;
 				$data->ticksSinceMotion = 0;
@@ -254,6 +271,32 @@ final class PacketHandler {
 			$data->latencyManager->add($event->timestamp, function () use ($data, $packet): void {
 				$real = RuntimeBlockMapping::fromStaticRuntimeId($packet->blockRuntimeId);
 				$data->world->setBlock(new Vector3($packet->x, $packet->y, $packet->z), $real[0], 0);
+			});
+		} elseif ($packet instanceof MobEffectPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {
+			$data->latencyManager->add($event->timestamp, function () use ($data, $packet): void {
+				switch ($packet->eventId) {
+					case MobEffectPacket::EVENT_ADD:
+						$effectData = new EffectData();
+						$effectData->effectId = $packet->effectId;
+						$effectData->ticks = $packet->duration;
+						$effectData->amplifier = $packet->amplifier + 1;
+						$data->effects[$packet->effectId] = $effectData;
+						break;
+					case MobEffectPacket::EVENT_MODIFY:
+						$effectData = $data->effects[$packet->effectId] ?? null;
+						if ($effectData !== null) {
+							$effectData->amplifier = $packet->amplifier + 1;
+							$effectData->ticks = $packet->duration;
+						}
+						break;
+					case MobEffectPacket::EVENT_REMOVE:
+						unset($data->effects[$packet->effectId]);
+						break;
+				}
+			});
+		} elseif ($packet instanceof MovePlayerPacket && $packet->entityRuntimeId === $data->entityRuntimeId && $packet->mode === MovePlayerPacket::MODE_TELEPORT) {
+			$data->latencyManager->add($event->timestamp, function () use ($data): void {
+				$data->isTeleporting = true;
 			});
 		}
 	}

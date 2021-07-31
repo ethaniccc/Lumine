@@ -2,10 +2,16 @@
 
 namespace LumineServer\data;
 
+use LumineServer\data\click\ClickData;
+use LumineServer\data\effect\EffectData;
 use LumineServer\data\handler\GhostBlockHandler;
+use LumineServer\data\handler\MovementPredictionHandler;
 use LumineServer\data\handler\NetworkStackLatencyManager;
 use LumineServer\data\handler\PacketHandler;
+use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\world\VirtualWorld;
+use LumineServer\detections\DetectionModule;
+use LumineServer\detections\movement\MovementA;
 use LumineServer\utils\AABB;
 use pocketmine\block\Block;
 use pocketmine\level\Location;
@@ -29,6 +35,8 @@ final class UserData {
 	public Vector3 $motion;
 	public Vector3 $lastMotion;
 	public Vector3 $clientPrediction;
+	public Vector3 $serverPredictedMotion;
+	public Vector3 $previousServerPredictedMotion;
 	public Vector3 $serverSentMotion;
 
 	public int $ticksSinceMotion = 0;
@@ -39,39 +47,63 @@ final class UserData {
 	public int $ticksSinceInClimbable = 0;
 
 	public bool $onGround = true;
+	public bool $lastOnGround = true;
 	public bool $expectedOnGround = true;
 	public bool $isCollidedVertically = true;
 	public bool $hasCollisionAbove = false;
 	public bool $isCollidedHorizontally = true;
 	public bool $isInLoadedChunk = false;
 	public bool $isInVoid = false;
+	public bool $isSprinting = false;
+	public bool $isSneaking = false;
+	public bool $isJumping = false;
+	public bool $isTeleporting = true;
 
 	public float $moveForward = 0.0;
 	public float $moveStrafe = 0.0;
+	public float $movementSpeed = 0.1;
+	public float $jumpVelocity = MovementConstants::DEFAULT_JUMP_MOTION;
+	public float $gravity = MovementConstants::NORMAL_GRAVITY;
+
+	/** @var EffectData[] */
+	public array $effects = [];
 
 	/** @var Block[] */
 	public array $blocksBelow = [];
 	/** @var Block[] */
 	public array $lastBlocksBelow = [];
+	/** @var Block[] */
+	public array $blocksAbove = [];
+	/** @var Block[] */
+	public array $lastBlocksAbove = [];
 
 	public AABB $boundingBox;
 	public float $hitboxWidth = 0.3;
 	public float $hitboxHeight = 1.8;
+	public float $ySize = 0.0;
+
+	public ?ClickData $clickData;
 
 	public ?VirtualWorld $world;
 
 	public int $sendPackets = 0;
 	public BatchPacket $sendQueue;
 
+	/** @var DetectionModule[] */
+	public array $detections = [];
+
 	public ?PacketHandler $handler;
 	public ?NetworkStackLatencyManager $latencyManager;
 	public ?GhostBlockHandler $ghostBlockHandler;
+	public ?MovementPredictionHandler $movementPredictionHandler;
 
 	public function __construct(string $identifier) {
 		$this->identifier = $identifier;
 		$this->handler = new PacketHandler($this);
 		$this->latencyManager = new NetworkStackLatencyManager($this);
 		$this->ghostBlockHandler = new GhostBlockHandler($this);
+		$this->movementPredictionHandler = new MovementPredictionHandler($this);
+		$this->clickData = new ClickData();
 		$this->world = new VirtualWorld();
 
 		$this->currentPos = Location::fromObject(new Vector3(0, 0, 0));
@@ -81,6 +113,12 @@ final class UserData {
 		$this->lastMotion = new Vector3(0, 0, 0);
 		$this->serverSentMotion = new Vector3(0, 0, 0);
 		$this->clientPrediction = new Vector3(0, -0.078, 0);
+		$this->serverPredictedMotion = new Vector3(0, 0, 0);
+		$this->previousServerPredictedMotion = new Vector3(0, 0, 0);
+
+		$this->detections = [
+			new MovementA($this),
+		];
 
 		$this->sendQueue = new BatchPacket();
 		$this->sendQueue->setCompressionLevel(7);
@@ -91,7 +129,7 @@ final class UserData {
 			if (!$this->loggedIn && !$packet->canBeSentBeforeLogin()) {
 				return;
 			}
-			$this->sendPackets += 1;
+			$this->sendPackets++;
 			$this->sendQueue->addPacket($packet);
 		}
 	}
@@ -113,7 +151,9 @@ final class UserData {
 		$packet->pitch = $this->currentPos->pitch;
 		$packet->headYaw = $packet->yaw;
 		$packet->mode = MovePlayerPacket::MODE_TELEPORT;
-		$this->queue($packet);
+		$this->latencyManager->sandwich(function (): void {
+			$this->isTeleporting = true;
+		}, $packet);
 	}
 
 	public function destroy(): void {
@@ -123,8 +163,15 @@ final class UserData {
 		$this->latencyManager = null;
 		$this->ghostBlockHandler->destroy();
 		$this->ghostBlockHandler = null;
+		$this->movementPredictionHandler->destroy();
+		$this->movementPredictionHandler = null;
 		$this->world->destroy();
 		$this->world = null;
+		$this->clickData = null;
+		foreach (array_keys($this->detections) as $key) {
+			$this->detections[$key]->destroy();
+			unset($this->detections[$key]);
+		}
 	}
 
 }

@@ -17,3 +17,8 @@
 
 server_port: 3001
 memory_limit: 2048M
+
+detections:
+  Movement:
+    A:
+      enabled: true
