@@ -34,9 +34,9 @@ final class NetworkStackLatencyManager {
 		$this->data->queue($packet);
 	}
 
-	public function execute(int $timestamp): void {
+	public function execute(int $timestamp, float $recieve): void {
 		if (isset($this->list[$timestamp])) {
-			($this->list[$timestamp])();
+			($this->list[$timestamp])($recieve);
 		}
 		unset($this->list[$timestamp]);
 	}

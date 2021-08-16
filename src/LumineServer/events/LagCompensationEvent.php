@@ -15,7 +15,7 @@ final class LagCompensationEvent extends SocketEvent {
 	public function __construct(array $data) {
 		$this->identifier = $data["identifier"];
 		$this->timestamp = $data["timestamp"];
-		$this->packet = $data["packet"] instanceof DataPacket ? $data["packet"] : unserialize(base64_decode($data["packet"]));
+		$this->packet = $data["packet"];
 	}
 
 }

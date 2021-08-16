@@ -3,7 +3,6 @@
 namespace LumineServer\events;
 
 use pocketmine\network\mcpe\protocol\BatchPacket;
-use pocketmine\network\mcpe\protocol\DataPacket;
 
 final class ServerSendPacketEvent extends SocketEvent {
 
@@ -15,7 +14,7 @@ final class ServerSendPacketEvent extends SocketEvent {
 
 	public function __construct(array $data) {
 		$this->identifier = $data["identifier"];
-		$this->packet = $data["packet"] instanceof DataPacket ? $data["packet"] : unserialize(base64_decode($data["packet"]));
+		$this->packet = $data["packet"];
 		$this->timestamp = $data["timestamp"];
 	}
 

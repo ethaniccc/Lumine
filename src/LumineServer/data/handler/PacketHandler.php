@@ -4,6 +4,7 @@ namespace LumineServer\data\handler;
 
 use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
+use LumineServer\data\auth\AuthData;
 use LumineServer\data\effect\EffectData;
 use LumineServer\data\effect\ExtraEffectIds;
 use LumineServer\data\movement\MovementConstants;
@@ -23,6 +24,7 @@ use pocketmine\block\Liquid;
 use pocketmine\block\UnknownBlock;
 use pocketmine\block\Vine;
 use pocketmine\entity\Effect;
+use pocketmine\entity\Entity;
 use pocketmine\level\Level;
 use pocketmine\level\Location;
 use pocketmine\level\Position;
@@ -32,16 +34,19 @@ use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
 use pocketmine\network\mcpe\protocol\LevelChunkPacket;
+use pocketmine\network\mcpe\protocol\LoginPacket;
 use pocketmine\network\mcpe\protocol\MobEffectPacket;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\NetworkChunkPublisherUpdatePacket;
 use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use pocketmine\network\mcpe\protocol\SetActorDataPacket;
 use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\SetLocalPlayerAsInitializedPacket;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
+use pocketmine\utils\TextFormat;
 
 final class PacketHandler {
 
@@ -133,6 +138,24 @@ final class PacketHandler {
 
 			$data->isTeleporting = false;
 
+			$liquids = $cobweb = 0;
+			$surroundingBlocks = LevelUtils::checkBlocksInAABB($data->boundingBox->expandedCopy(0.2, 0.2, 0.2), $data->world, LevelUtils::SEARCH_ALL);
+			foreach ($surroundingBlocks as $block) {
+				if ($block instanceof Liquid) {
+					$liquids++;
+				} elseif ($block instanceof Cobweb) {
+					$cobweb++;
+				}
+			}
+
+			$liquids === 0 ?
+				$data->ticksSinceInLiquid++ :
+				$data->ticksSinceInLiquid = 0;
+
+			$cobweb === 0 ?
+				$data->ticksSinceInCobweb++ :
+				$data->ticksSinceInCobweb = 0;
+
 			$data->ticksSinceMotion++;
 			if ($data->onGround) {
 				$data->ticksOnGround++;
@@ -142,11 +165,19 @@ final class PacketHandler {
 				$data->ticksOnGround = 0;
 			}
 			$data->currentTick++;
+
+			/* if ($data->currentTick % 20 === 0) {
+				$diff = microtime(true) - $timestamp;
+				$start = microtime(true);
+				$data->latencyManager->send(function (float $timestamp) use ($data, $start, $diff): void {
+					$data->latency = ceil(($timestamp - $start - $diff) * 1000);
+				});
+			} */
 		} elseif ($packet instanceof SetLocalPlayerAsInitializedPacket) {
 			$data->loggedIn = true;
 			$data->entityRuntimeId = $packet->entityRuntimeId;
 		} elseif ($packet instanceof NetworkStackLatencyPacket) {
-			$data->latencyManager->execute($packet->timestamp);
+			$data->latencyManager->execute($packet->timestamp, $timestamp);
 		} elseif ($packet instanceof InventoryTransactionPacket) {
 			$trData = $packet->trData;
 			if ($trData instanceof UseItemTransactionData) {
@@ -171,6 +202,16 @@ final class PacketHandler {
 					}
 				}
 			}
+		} elseif ($packet instanceof LoginPacket) {
+			try {
+				$d = $packet->chainData;
+				$parts = explode(".", $d['chain'][2]);
+				$jwt = json_decode(base64_decode($parts[1], true), true);
+				$auth = $jwt['extraData'];
+				$data->authData = new AuthData($auth["XUID"], $auth["identity"], TextFormat::clean($auth["displayName"]), $auth["titleId"]);
+			} catch (\Exception $e) {
+				$data->authData = new AuthData("UNKNOWN", "UNKNOWN", TextFormat::clean($packet->clientData["ThirdPartyName"]), "UNKNOWN");
+			}
 		}
 
 		foreach ($data->detections as $detection) {
@@ -190,14 +231,14 @@ final class PacketHandler {
 				if ($pk instanceof LevelChunkPacket) {
 					$chunk = NetworkChunkDeserializer::chunkNetworkDeserialize($pk->getExtraPayload(), $pk->getChunkX(), $pk->getChunkZ(), $pk->getSubChunkCount());
 					if ($data->loggedIn) {
-						$data->latencyManager->sandwich(function () use ($data, $chunk): void {
+						$data->latencyManager->send(function (float $timestamp) use ($data, $chunk): void {
 							$data->world->addChunk($chunk);
-						}, $pk);
+						});
 					} else {
 						$data->world->addChunk($chunk);
 					}
 				} elseif ($pk instanceof NetworkChunkPublisherUpdatePacket) {
-					$data->latencyManager->sandwich(function () use ($data, $pk): void {
+					$data->latencyManager->sandwich(function (float $timestamp) use ($data, $pk): void {
 						$toRemove = $data->world->getAllChunks();
 						$centerX = $pk->x >> 4;
 						$centerZ = $pk->z >> 4;
@@ -298,6 +339,30 @@ final class PacketHandler {
 			$data->latencyManager->add($event->timestamp, function () use ($data): void {
 				$data->isTeleporting = true;
 			});
+		} elseif ($packet instanceof SetActorDataPacket) {
+			$isFlagTrueInPropertyMess = function (int $targetFlag, int $data): bool {
+				$flagID = $targetFlag % 64;
+				return ($data & (1 << ($flagID))) > 0;
+			};
+			if ($data->loggedIn) {
+				$data->latencyManager->add($event->timestamp, function () use ($data, $packet, $isFlagTrueInPropertyMess): void {
+					$hitboxWidth = isset($packet->metadata[53]) ? ($packet->metadata[53][1] / 2) : $data->hitboxWidth;
+					$hitboxHeight = $packet->metadata[54][1] ?? $data->hitboxHeight;
+					$data->hitboxWidth = $hitboxWidth;
+					$data->hitboxHeight = $hitboxHeight;
+					if (isset($packet->metadata[0])) {
+						$data->isImmobile = $isFlagTrueInPropertyMess(Entity::DATA_FLAG_IMMOBILE, $packet->metadata[0][1]);
+					}
+				});
+			} else {
+				$hitboxWidth = isset($packet->metadata[53]) ? ($packet->metadata[53][1] / 2) : $data->hitboxWidth;
+				$hitboxHeight = $packet->metadata[54][1] ?? $data->hitboxHeight;
+				$data->hitboxWidth = $hitboxWidth;
+				$data->hitboxHeight = $hitboxHeight;
+				if (isset($packet->metadata[0])) {
+					$data->isImmobile = $isFlagTrueInPropertyMess(Entity::DATA_FLAG_IMMOBILE, $packet->metadata[0][1]);
+				}
+			}
 		}
 	}
 

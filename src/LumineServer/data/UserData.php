@@ -2,6 +2,7 @@
 
 namespace LumineServer\data;
 
+use LumineServer\data\auth\AuthData;
 use LumineServer\data\click\ClickData;
 use LumineServer\data\effect\EffectData;
 use LumineServer\data\handler\GhostBlockHandler;
@@ -10,8 +11,11 @@ use LumineServer\data\handler\NetworkStackLatencyManager;
 use LumineServer\data\handler\PacketHandler;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\world\VirtualWorld;
+use LumineServer\detections\badpackets\BadPacketsA;
+use LumineServer\detections\combat\CombatA;
 use LumineServer\detections\DetectionModule;
 use LumineServer\detections\movement\MovementA;
+use LumineServer\detections\movement\MovementB;
 use LumineServer\utils\AABB;
 use pocketmine\block\Block;
 use pocketmine\level\Location;
@@ -23,10 +27,9 @@ use pocketmine\network\mcpe\protocol\TextPacket;
 
 final class UserData {
 
-	public string $identifier;
-
 	public int $currentTick = 0;
 	public int $entityRuntimeId = -1;
+	public int $latency = -1;
 	public bool $loggedIn = false;
 
 	public Location $currentPos;
@@ -38,6 +41,7 @@ final class UserData {
 	public Vector3 $serverPredictedMotion;
 	public Vector3 $previousServerPredictedMotion;
 	public Vector3 $serverSentMotion;
+	public Vector3 $lastOnGroundLocation;
 
 	public int $ticksSinceMotion = 0;
 	public int $ticksOnGround = 0;
@@ -58,6 +62,7 @@ final class UserData {
 	public bool $isSneaking = false;
 	public bool $isJumping = false;
 	public bool $isTeleporting = true;
+	public bool $isImmobile = false;
 
 	public float $moveForward = 0.0;
 	public float $moveStrafe = 0.0;
@@ -83,6 +88,7 @@ final class UserData {
 	public float $ySize = 0.0;
 
 	public ?ClickData $clickData;
+	public ?AuthData $authData = null;
 
 	public ?VirtualWorld $world;
 
@@ -97,8 +103,10 @@ final class UserData {
 	public ?GhostBlockHandler $ghostBlockHandler;
 	public ?MovementPredictionHandler $movementPredictionHandler;
 
-	public function __construct(string $identifier) {
-		$this->identifier = $identifier;
+	public function __construct(
+		public string $identifier,
+		public string $socketAddress
+	) {
 		$this->handler = new PacketHandler($this);
 		$this->latencyManager = new NetworkStackLatencyManager($this);
 		$this->ghostBlockHandler = new GhostBlockHandler($this);
@@ -115,9 +123,13 @@ final class UserData {
 		$this->clientPrediction = new Vector3(0, -0.078, 0);
 		$this->serverPredictedMotion = new Vector3(0, 0, 0);
 		$this->previousServerPredictedMotion = new Vector3(0, 0, 0);
+		$this->lastOnGroundLocation = new Vector3(0, 0, 0);
 
 		$this->detections = [
 			new MovementA($this),
+			new MovementB($this),
+			new CombatA($this),
+			new BadPacketsA($this),
 		];
 
 		$this->sendQueue = new BatchPacket();
@@ -151,7 +163,7 @@ final class UserData {
 		$packet->pitch = $this->currentPos->pitch;
 		$packet->headYaw = $packet->yaw;
 		$packet->mode = MovePlayerPacket::MODE_TELEPORT;
-		$this->latencyManager->sandwich(function (): void {
+		$this->latencyManager->sandwich(function (float $timestamp): void {
 			$this->isTeleporting = true;
 		}, $packet);
 	}

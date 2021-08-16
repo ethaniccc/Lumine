@@ -78,9 +78,13 @@ final class LevelUtils {
 		return $blocks;
 	}
 
+	/**
+	 * @param AxisAlignedBB $AABB
+	 * @param VirtualWorld $world
+	 * @return AxisAlignedBB[]
+	 */
 	public static function getCollisionBBList(AxisAlignedBB $AABB, VirtualWorld $world): array {
 		$list = [];
-		$AABB = $AABB->expandedCopy(0.0001, 0, 0.0001);
 		$minX = floor($AABB->minX - 1);
 		$maxX = ceil($AABB->maxX + 1);
 		$minY = floor($AABB->minY - 1);
@@ -91,8 +95,9 @@ final class LevelUtils {
 			for ($x = $minX; $x <= $maxX; ++$x) {
 				for ($y = $minY; $y <= $maxY; ++$y) {
 					$block = $world->getBlockAt($x, $y, $z);
-					if (!$block->canPassThrough() || $block instanceof UnknownBlock) {
+					if (!$block->canPassThrough()) {
 						foreach ($block->getCollisionBoxes() as $bb) {
+							$bb = $bb->expandedCopy(0.001, 0, 0.001);
 							if ($bb->intersectsWith($AABB)) {
 								$list[] = $bb;
 							}

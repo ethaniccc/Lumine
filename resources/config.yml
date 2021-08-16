@@ -15,10 +15,22 @@
 #  Proprietary and confidential
 #  Written by Benjamin <schooldocumentsandstuff@gmail.com> on July, 2021
 
+bind_address: "10.128.0.3"
 server_port: 3001
 memory_limit: 2048M
 
 detections:
   Movement:
+    A:
+      enabled: true
+      setback: true
+    B:
+      enabled: true
+      setback: true
+  Combat:
+    A:
+      enabled: true
+      diff: 4
+  BadPackets:
     A:
       enabled: true

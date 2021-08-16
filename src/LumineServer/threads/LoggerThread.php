@@ -42,11 +42,10 @@ class LoggerThread extends \Thread {
 	}
 
 	public function log(string $data, bool $write = true): void {
+		echo "[LumineServer] $data\n";
 		if ($write) {
 			$this->buffer[] = $data;
 			$this->notify();
-		} else {
-			echo "[LumineServer] $data\n";
 		}
 	}
 
@@ -54,7 +53,6 @@ class LoggerThread extends \Thread {
 		while ($this->buffer->count() > 0) {
 			/** @var string $line */
 			$line = $this->buffer->pop();
-			echo "[LumineServer] $line\n";
 			fwrite($stream, $line . "\n");
 		}
 	}

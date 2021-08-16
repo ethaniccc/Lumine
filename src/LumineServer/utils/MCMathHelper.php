@@ -20,4 +20,8 @@ final class MCMathHelper {
 		return self::$SIN_TABLE[(int)($var * 10430.378 + 16384.0) & 65535];
 	}
 
+	public static function clamp_float(float $num, float $min, float $max): float {
+		return $num < $min ? $min : ($num > $max ? $max : $num);
+	}
+
 }
