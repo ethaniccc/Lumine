@@ -1,4 +1,6 @@
 .idea/*
 bin/*
+bin-7/*
+bin-linux-8/*
 vendor/*
 logs/*
