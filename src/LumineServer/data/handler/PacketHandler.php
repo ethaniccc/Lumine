@@ -30,22 +30,31 @@ use pocketmine\level\Location;
 use pocketmine\level\Position;
 use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
+use pocketmine\network\mcpe\NetworkBinaryStream;
+use pocketmine\network\mcpe\protocol\AddActorPacket;
+use pocketmine\network\mcpe\protocol\AddPlayerPacket;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
 use pocketmine\network\mcpe\protocol\LevelChunkPacket;
 use pocketmine\network\mcpe\protocol\LoginPacket;
 use pocketmine\network\mcpe\protocol\MobEffectPacket;
+use pocketmine\network\mcpe\protocol\MoveActorAbsolutePacket;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\NetworkChunkPublisherUpdatePacket;
 use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use pocketmine\network\mcpe\protocol\RemoveActorPacket;
 use pocketmine\network\mcpe\protocol\SetActorDataPacket;
 use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\SetLocalPlayerAsInitializedPacket;
+use pocketmine\network\mcpe\protocol\StartGamePacket;
+use pocketmine\network\mcpe\protocol\types\DeviceOS;
+use pocketmine\network\mcpe\protocol\types\inventory\UseItemOnEntityTransactionData;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
+use pocketmine\utils\BinaryStream;
 use pocketmine\utils\TextFormat;
 
 final class PacketHandler {
@@ -54,7 +63,7 @@ final class PacketHandler {
 
 	private const USED_PACKETS = [
 		ProtocolInfo::LEVEL_CHUNK_PACKET, ProtocolInfo::NETWORK_CHUNK_PUBLISHER_UPDATE_PACKET, ProtocolInfo::NETWORK_STACK_LATENCY_PACKET,
-		ProtocolInfo::UPDATE_BLOCK_PACKET,
+		ProtocolInfo::UPDATE_BLOCK_PACKET, ProtocolInfo::START_GAME_PACKET
 	];
 
 	public function __construct(UserData $data) {
@@ -85,6 +94,8 @@ final class PacketHandler {
 			} else {
 				$data->isJumping = false;
 			}
+
+			$data->jumpVelocity = MovementConstants::DEFAULT_JUMP_MOTION;
 
 			foreach ($data->effects as $effectData) {
 				$effectData->ticks--;
@@ -138,13 +149,15 @@ final class PacketHandler {
 
 			$data->isTeleporting = false;
 
-			$liquids = $cobweb = 0;
+			$liquids = $cobweb = $climbable = 0;
 			$surroundingBlocks = LevelUtils::checkBlocksInAABB($data->boundingBox->expandedCopy(0.2, 0.2, 0.2), $data->world, LevelUtils::SEARCH_ALL);
 			foreach ($surroundingBlocks as $block) {
 				if ($block instanceof Liquid) {
 					$liquids++;
 				} elseif ($block instanceof Cobweb) {
 					$cobweb++;
+				} elseif ($block->canClimb()) {
+					$climbable++;
 				}
 			}
 
@@ -156,6 +169,10 @@ final class PacketHandler {
 				$data->ticksSinceInCobweb++ :
 				$data->ticksSinceInCobweb = 0;
 
+			$climbable === 0 ?
+				$data->ticksSinceInClimbable++ :
+				$data->ticksSinceInCobweb = 0;
+
 			$data->ticksSinceMotion++;
 			if ($data->onGround) {
 				$data->ticksOnGround++;
@@ -164,15 +181,25 @@ final class PacketHandler {
 				$data->ticksOffGround++;
 				$data->ticksOnGround = 0;
 			}
+
+			$data->locationMap->tick();
 			$data->currentTick++;
 
-			/* if ($data->currentTick % 20 === 0) {
-				$diff = microtime(true) - $timestamp;
-				$start = microtime(true);
-				$data->latencyManager->send(function (float $timestamp) use ($data, $start, $diff): void {
-					$data->latency = ceil(($timestamp - $start - $diff) * 1000);
-				});
-			} */
+			if ($data->lastACKTick === -1 && $data->loggedIn) {
+				$data->lastACKTick = $data->currentTick;
+			} elseif ($data->lastACKTick !== -1) {
+				if ($data->waitingACKCount > 0) {
+					$tickDiff = $data->currentTick - $data->lastACKTick;
+					if ($tickDiff > 300 && $data->waitingACKCount >= 40) {
+						$data->disconnect(Server::getInstance()->settings->get(
+							"timeout_message",
+							"NetworkStackLatency timeout\nPlease contact a staff member if this issue persists"
+						));
+					}
+				} else {
+					$data->lastACKTick = $data->currentTick;
+				}
+			}
 		} elseif ($packet instanceof SetLocalPlayerAsInitializedPacket) {
 			$data->loggedIn = true;
 			$data->entityRuntimeId = $packet->entityRuntimeId;
@@ -212,6 +239,7 @@ final class PacketHandler {
 			} catch (\Exception $e) {
 				$data->authData = new AuthData("UNKNOWN", "UNKNOWN", TextFormat::clean($packet->clientData["ThirdPartyName"]), "UNKNOWN");
 			}
+			$data->playerOS = $packet->clientData["DeviceOS"];
 		}
 
 		foreach ($data->detections as $detection) {
@@ -295,6 +323,8 @@ final class PacketHandler {
 					if ($realBlock->getId() !== $blockId) {
 						$data->ghostBlockHandler->suspect(BlockFactory::get($blockId, 0, Position::fromObject($position)));
 					}
+				} elseif ($packet instanceof StartGamePacket) {
+					$data->entityRuntimeId = $packet->entityRuntimeId;
 				}
 			}
 		}
@@ -303,18 +333,19 @@ final class PacketHandler {
 	public function compensate(LagCompensationEvent $event): void {
 		$data = $this->data;
 		$packet = $event->packet;
+		$timestamp = $event->timestamp;
 		if ($packet instanceof SetActorMotionPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {
-			$data->latencyManager->add($event->timestamp, function () use ($data, $packet): void {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				$data->serverSentMotion = $packet->motion;
 				$data->ticksSinceMotion = 0;
 			});
 		} elseif ($packet instanceof UpdateBlockPacket) {
-			$data->latencyManager->add($event->timestamp, function () use ($data, $packet): void {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				$real = RuntimeBlockMapping::fromStaticRuntimeId($packet->blockRuntimeId);
 				$data->world->setBlock(new Vector3($packet->x, $packet->y, $packet->z), $real[0], 0);
 			});
 		} elseif ($packet instanceof MobEffectPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {
-			$data->latencyManager->add($event->timestamp, function () use ($data, $packet): void {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				switch ($packet->eventId) {
 					case MobEffectPacket::EVENT_ADD:
 						$effectData = new EffectData();
@@ -336,7 +367,7 @@ final class PacketHandler {
 				}
 			});
 		} elseif ($packet instanceof MovePlayerPacket && $packet->entityRuntimeId === $data->entityRuntimeId && $packet->mode === MovePlayerPacket::MODE_TELEPORT) {
-			$data->latencyManager->add($event->timestamp, function () use ($data): void {
+			$data->latencyManager->add($timestamp, function () use ($data): void {
 				$data->isTeleporting = true;
 			});
 		} elseif ($packet instanceof SetActorDataPacket) {
@@ -344,25 +375,59 @@ final class PacketHandler {
 				$flagID = $targetFlag % 64;
 				return ($data & (1 << ($flagID))) > 0;
 			};
-			if ($data->loggedIn) {
-				$data->latencyManager->add($event->timestamp, function () use ($data, $packet, $isFlagTrueInPropertyMess): void {
-					$hitboxWidth = isset($packet->metadata[53]) ? ($packet->metadata[53][1] / 2) : $data->hitboxWidth;
-					$hitboxHeight = $packet->metadata[54][1] ?? $data->hitboxHeight;
+			if ($packet->entityRuntimeId === $data->entityRuntimeId) {
+				if ($data->loggedIn) {
+					$data->latencyManager->add($timestamp, function () use ($data, $packet, $isFlagTrueInPropertyMess): void {
+						$hitboxWidth = isset($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH]) ? ($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH][1] / 2) : $data->hitboxWidth;
+						$hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
+						$data->hitboxWidth = $hitboxWidth;
+						$data->hitboxHeight = $hitboxHeight;
+						if (isset($packet->metadata[0])) {
+							$data->isImmobile = $isFlagTrueInPropertyMess(Entity::DATA_FLAG_IMMOBILE, $packet->metadata[0][1]);
+						}
+					});
+				} else {
+					$hitboxWidth = isset($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH]) ? ($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH][1] / 2) : $data->hitboxWidth;
+					$hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
 					$data->hitboxWidth = $hitboxWidth;
 					$data->hitboxHeight = $hitboxHeight;
 					if (isset($packet->metadata[0])) {
 						$data->isImmobile = $isFlagTrueInPropertyMess(Entity::DATA_FLAG_IMMOBILE, $packet->metadata[0][1]);
 					}
-				});
+				}
 			} else {
-				$hitboxWidth = isset($packet->metadata[53]) ? ($packet->metadata[53][1] / 2) : $data->hitboxWidth;
-				$hitboxHeight = $packet->metadata[54][1] ?? $data->hitboxHeight;
-				$data->hitboxWidth = $hitboxWidth;
-				$data->hitboxHeight = $hitboxHeight;
-				if (isset($packet->metadata[0])) {
-					$data->isImmobile = $isFlagTrueInPropertyMess(Entity::DATA_FLAG_IMMOBILE, $packet->metadata[0][1]);
+				if ($data->loggedIn) {
+					$target = $data->locationMap->get($packet->entityRuntimeId);
+					if ($target !== null) {
+						$target->hitboxWidth = isset($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH]) ? ($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH][1] / 2) : $target->hitboxWidth;
+						$target->hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
+					}
 				}
 			}
+		} elseif ($packet instanceof AddActorPacket || $packet instanceof AddPlayerPacket) {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
+				$data->locationMap->add($packet->entityRuntimeId, $packet->position, $packet->motion, $packet instanceof AddPlayerPacket);
+			});
+		} elseif ($packet instanceof RemoveActorPacket) {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
+				$data->locationMap->remove($packet->entityUniqueId);
+			});
+		} elseif ($packet instanceof BatchPacket) {
+			// The only batch packet that will ever be here is a packet full of entity locations.
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
+				$stream = new NetworkBinaryStream($packet->payload);
+				while (!$stream->feof()) {
+					$pk = PacketPool::getPacket($stream->getString());
+					$pk->decode();
+					if ($pk instanceof MovePlayerPacket || $pk instanceof MoveActorAbsolutePacket) {
+						$target = $data->locationMap->get($pk->entityRuntimeId);
+						if ($target !== null) {
+							$position = $pk instanceof MovePlayerPacket ? $pk->position->subtract(0, 1.62) : $pk->position;
+							$target->set($position);
+						}
+					}
+				}
+			});
 		}
 	}
 

@@ -13,6 +13,7 @@ use pocketmine\item\ItemFactory;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\snooze\SleeperHandler;
 use pocketmine\snooze\SleeperNotifier;
+use pocketmine\utils\TextFormat;
 
 final class Server {
 
@@ -102,6 +103,10 @@ final class Server {
 		$this->logger->quit();
 		$this->console->quit();
 		exit("Terminated.");
+	}
+
+	public function getLuminePrefix(): string {
+		return $this->settings->get("prefix", "§l§8[§dL§6u§em§bi§5n§de§8]") . TextFormat::RESET;
 	}
 
 	public function shutdown(): void {

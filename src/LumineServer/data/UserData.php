@@ -9,21 +9,28 @@ use LumineServer\data\handler\GhostBlockHandler;
 use LumineServer\data\handler\MovementPredictionHandler;
 use LumineServer\data\handler\NetworkStackLatencyManager;
 use LumineServer\data\handler\PacketHandler;
+use LumineServer\data\location\LocationMap;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\world\VirtualWorld;
+use LumineServer\detections\auth\AuthA;
 use LumineServer\detections\badpackets\BadPacketsA;
 use LumineServer\detections\combat\CombatA;
+use LumineServer\detections\combat\CombatB;
 use LumineServer\detections\DetectionModule;
 use LumineServer\detections\movement\MovementA;
 use LumineServer\detections\movement\MovementB;
+use LumineServer\detections\movement\VelocityA;
+use LumineServer\detections\movement\VelocityB;
 use LumineServer\utils\AABB;
 use pocketmine\block\Block;
 use pocketmine\level\Location;
 use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
+use pocketmine\network\mcpe\protocol\DisconnectPacket;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\TextPacket;
+use pocketmine\network\mcpe\protocol\types\DeviceOS;
 
 final class UserData {
 
@@ -54,7 +61,6 @@ final class UserData {
 	public bool $lastOnGround = true;
 	public bool $expectedOnGround = true;
 	public bool $isCollidedVertically = true;
-	public bool $hasCollisionAbove = false;
 	public bool $isCollidedHorizontally = true;
 	public bool $isInLoadedChunk = false;
 	public bool $isInVoid = false;
@@ -73,15 +79,6 @@ final class UserData {
 	/** @var EffectData[] */
 	public array $effects = [];
 
-	/** @var Block[] */
-	public array $blocksBelow = [];
-	/** @var Block[] */
-	public array $lastBlocksBelow = [];
-	/** @var Block[] */
-	public array $blocksAbove = [];
-	/** @var Block[] */
-	public array $lastBlocksAbove = [];
-
 	public AABB $boundingBox;
 	public float $hitboxWidth = 0.3;
 	public float $hitboxHeight = 1.8;
@@ -89,6 +86,13 @@ final class UserData {
 
 	public ?ClickData $clickData;
 	public ?AuthData $authData = null;
+
+	public LocationMap $locationMap;
+
+	public int $playerOS = DeviceOS::UNKNOWN;
+
+	public int $lastACKTick = -1;
+	public int $waitingACKCount = 0;
 
 	public ?VirtualWorld $world;
 
@@ -125,10 +129,16 @@ final class UserData {
 		$this->previousServerPredictedMotion = new Vector3(0, 0, 0);
 		$this->lastOnGroundLocation = new Vector3(0, 0, 0);
 
+		$this->locationMap = new LocationMap();
+
 		$this->detections = [
 			new MovementA($this),
 			new MovementB($this),
+			new VelocityA($this),
+			new VelocityB($this),
 			new CombatA($this),
+			new CombatB($this),
+			new AuthA($this),
 			new BadPacketsA($this),
 		];
 
@@ -166,6 +176,12 @@ final class UserData {
 		$this->latencyManager->sandwich(function (float $timestamp): void {
 			$this->isTeleporting = true;
 		}, $packet);
+	}
+
+	public function disconnect(string $message = "Lumine - No Reason Provided"): void {
+		$packet = new DisconnectPacket();
+		$packet->message = $message;
+		$this->queue($packet);
 	}
 
 	public function destroy(): void {

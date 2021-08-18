@@ -19,18 +19,63 @@ bind_address: "10.128.0.3"
 server_port: 3001
 memory_limit: 2048M
 
+prefix: "§l§8[§dL§6u§em§bi§5n§de§8]"
+
+timeout_message: "NetworkStackLatency timeout\nPlease contact staff if this issue persists"
+# Tags: {prefix}, {codename}
+kick_message: "{prefix} You were kicked from the server for potential unfair advantage (code={codename})\nPlease contact staff if this issue persists"
+# Tags: {prefix}, {player}, {codename}, {detection}
+kick_broadcast: "{prefix} §e{player} §7was kicked for §6{detection} §7(§c{codename}§7)"
+
 detections:
   Movement:
     A:
       enabled: true
-      setback: true
+      punishment_type: kick
+      max_vl: 50
+      codename: IMH
     B:
       enabled: true
-      setback: true
+      punishment_type: kick
+      max_vl: 50
+      codename: IMV
+  Velocity:
+    A:
+      enabled: true
+      min_pct: 99.99
+      max_pct: 110
+      punishment_type: kick
+      max_vl: 20
+      codename: AVV
+    B:
+      enabled: true
+      min_pct: 99.9
+      max_pct: 150
+      punishment_type: kick
+      max_vl: 20
+      codename: AHV
   Combat:
     A:
       enabled: true
       diff: 4
+      punishment_type: kick
+      max_vl: 10
+      codename: NSK
+    B:
+      enabled: true
+      max_dist: 3
+      punishment_type: kick
+      max_vl: 20
+      codename: ERD
+  Auth:
+    A:
+      enabled: true
+      punishment_type: ban
+      max_vl: 1
+      codename: EDA
   BadPackets:
     A:
       enabled: true
+      punishment_type: kick
+      max_vl: 20
+      codename: BPA

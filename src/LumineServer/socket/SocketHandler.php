@@ -32,7 +32,13 @@ final class SocketHandler {
 	}
 
 	public function start(): void {
-		socket_bind($this->socket, Server::getInstance()->settings->get("bind_address", "127.0.0.1"), $this->port);
+		if (!socket_set_option($this->socket, SOL_SOCKET, SO_REUSEADDR, 1)) {
+			Server::getInstance()->logger->log(socket_strerror(socket_last_error($this->socket)));
+		}
+		if (!socket_bind($this->socket, Server::getInstance()->settings->get("bind_address", "127.0.0.1"), $this->port)) {
+			Server::getInstance()->logger->log("Socket failed to bind to address");
+			Server::getInstance()->shutdown();
+		}
 		socket_listen($this->socket, SOMAXCONN);
 		socket_set_nonblock($this->socket);
 	}
