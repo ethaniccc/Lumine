@@ -35,9 +35,7 @@ final class NetworkStackLatencyManager {
 		$packet = new NetworkStackLatencyPacket();
 		$packet->timestamp = mt_rand(1, 100000000) * 1000;
 		$packet->needResponse = true;
-		$this->data->playerOS !== DeviceOS::PLAYSTATION ?
-			$this->add($packet->timestamp, $run) :
-			$this->add($packet->timestamp / 1000, $run);
+		$this->add($packet->timestamp, $run);
 		$this->data->queue($packet);
 	}
 
