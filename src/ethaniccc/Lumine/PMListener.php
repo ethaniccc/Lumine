@@ -2,6 +2,7 @@
 
 namespace ethaniccc\Lumine;
 
+use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use ethaniccc\Lumine\data\protocol\v428\PlayerBlockAction;
 use ethaniccc\Lumine\events\LagCompensationEvent;
@@ -12,24 +13,29 @@ use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\event\server\DataPacketSendEvent;
 use pocketmine\network\mcpe\protocol\BatchPacket;
+use pocketmine\network\mcpe\protocol\MoveActorAbsolutePacket;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\network\mcpe\protocol\PlayerActionPacket;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
-use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementSettings;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementType;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
 use pocketmine\tile\Spawnable;
+use pocketmine\utils\Binary;
 
 final class PMListener implements Listener {
 
 	public bool $isLumineSentPacket = false;
+	/** @var BatchPacket[] */
+	public array $locationCompensation = [];
 
 	private const USED_PACKETS = [
-		ProtocolInfo::SET_ACTOR_MOTION_PACKET, ProtocolInfo::UPDATE_BLOCK_PACKET
+		ProtocolInfo::SET_ACTOR_MOTION_PACKET, ProtocolInfo::UPDATE_BLOCK_PACKET, ProtocolInfo::MOB_EFFECT_PACKET,
+		ProtocolInfo::MOVE_PLAYER_PACKET, ProtocolInfo::SET_ACTOR_DATA_PACKET, ProtocolInfo::MOVE_ACTOR_ABSOLUTE_PACKET,
+		ProtocolInfo::ADD_ACTOR_PACKET, ProtocolInfo::ADD_PLAYER_PACKET, ProtocolInfo::REMOVE_ACTOR_PACKET
 	];
 
 	public function receive(DataPacketReceiveEvent $event): void {
@@ -40,7 +46,57 @@ final class PMListener implements Listener {
 		}
 		$identifier = Lumine::getInstance()->cache->get($player);
 		if ($packet instanceof PlayerAuthInputPacket) {
-
+			$event->setCancelled();
+			if (InputConstants::hasFlag($packet, InputConstants::START_SPRINTING)) {
+				$pk = new PlayerActionPacket();
+				$pk->entityRuntimeId = $player->getId();
+				$pk->action = PlayerActionPacket::ACTION_START_SPRINT;
+				$pk->x = $player->x;
+				$pk->y = $player->y;
+				$pk->z = $player->z;
+				$pk->face = $player->getDirection();
+				$player->handlePlayerAction($pk);
+			}
+			if (InputConstants::hasFlag($packet, InputConstants::STOP_SPRINTING)) {
+				$pk = new PlayerActionPacket();
+				$pk->entityRuntimeId = $player->getId();
+				$pk->action = PlayerActionPacket::ACTION_STOP_SPRINT;
+				$pk->x = $player->x;
+				$pk->y = $player->y;
+				$pk->z = $player->z;
+				$pk->face = $player->getDirection();
+				$player->handlePlayerAction($pk);
+			}
+			if (InputConstants::hasFlag($packet, InputConstants::START_SNEAKING)) {
+				$pk = new PlayerActionPacket();
+				$pk->entityRuntimeId = $player->getId();
+				$pk->action = PlayerActionPacket::ACTION_START_SNEAK;
+				$pk->x = $player->x;
+				$pk->y = $player->y;
+				$pk->z = $player->z;
+				$pk->face = $player->getDirection();
+				$player->handlePlayerAction($pk);
+			}
+			if (InputConstants::hasFlag($packet, InputConstants::STOP_SNEAKING)) {
+				$pk = new PlayerActionPacket();
+				$pk->entityRuntimeId = $player->getId();
+				$pk->action = PlayerActionPacket::ACTION_STOP_SNEAK;
+				$pk->x = $player->x;
+				$pk->y = $player->y;
+				$pk->z = $player->z;
+				$pk->face = $player->getDirection();
+				$player->handlePlayerAction($pk);
+			}
+			if (InputConstants::hasFlag($packet, InputConstants::START_JUMPING)) {
+				$pk = new PlayerActionPacket();
+				$pk->entityRuntimeId = $player->getId();
+				$pk->action = PlayerActionPacket::ACTION_JUMP;
+				$pk->x = $player->x;
+				$pk->y = $player->y;
+				$pk->z = $player->z;
+				$pk->face = $player->getDirection();
+				$player->handlePlayerAction($pk);
+			}
 			if ($packet->blockActions !== null) {
 				foreach ($packet->blockActions as $action) {
 					$pk = new PlayerActionPacket();
@@ -160,10 +216,25 @@ final class PMListener implements Listener {
 			if ($packet->getCompressionLevel() > 0) {
 				$packet->decode();
 			}
-			foreach ($packet->getPackets() as $buffer) {
+			$gen = $this->getAllInBatch($packet);
+			foreach ($gen as $buffer) {
 				$pk = PacketPool::getPacket($buffer);
 				if (in_array($pk->pid(), self::USED_PACKETS, true)) {
 					$pk->decode();
+					if (($pk instanceof MovePlayerPacket || $pk instanceof MoveActorAbsolutePacket) && $pk->entityRuntimeId !== $player->getId()) {
+						if (!isset($this->locationCompensation[$player->getName()])) {
+							$this->locationCompensation[$player->getName()] = new BatchPacket();
+							$this->locationCompensation[$player->getName()]->setCompressionLevel(4);
+						}
+						$this->locationCompensation[$player->getName()]->addPacket($pk);
+						if (count($gen) === 1) {
+							$event->setCancelled();
+						} else {
+							$packet->buffer = str_replace(zlib_encode(Binary::writeUnsignedVarInt(strlen($pk->buffer)) . $pk->buffer, ZLIB_ENCODING_RAW, $packet->getCompressionLevel()), "", $packet->buffer);
+							$packet->payload = str_replace(Binary::writeUnsignedVarInt(strlen($pk->buffer)) . $pk->buffer, "", $packet->payload);
+						}
+						continue;
+					}
 					$compensation = new BatchPacket();
 					$compensation->setCompressionLevel(0);
 					$var1 = new NetworkStackLatencyPacket();
@@ -190,6 +261,14 @@ final class PMListener implements Listener {
 
 	public function quit(PlayerQuitEvent $event): void {
 		Lumine::getInstance()->cache->remove($event->getPlayer());
+	}
+
+	private function getAllInBatch(BatchPacket $packet): array {
+		$arr = [];
+		foreach ($packet->getPackets() as $buff) {
+			$arr[] = $buff;
+		}
+		return $arr;
 	}
 
 }
