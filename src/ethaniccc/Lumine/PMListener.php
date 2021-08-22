@@ -35,7 +35,8 @@ final class PMListener implements Listener {
 	private const USED_PACKETS = [
 		ProtocolInfo::SET_ACTOR_MOTION_PACKET, ProtocolInfo::UPDATE_BLOCK_PACKET, ProtocolInfo::MOB_EFFECT_PACKET,
 		ProtocolInfo::MOVE_PLAYER_PACKET, ProtocolInfo::SET_ACTOR_DATA_PACKET, ProtocolInfo::MOVE_ACTOR_ABSOLUTE_PACKET,
-		ProtocolInfo::ADD_ACTOR_PACKET, ProtocolInfo::ADD_PLAYER_PACKET, ProtocolInfo::REMOVE_ACTOR_PACKET
+		ProtocolInfo::ADD_ACTOR_PACKET, ProtocolInfo::ADD_PLAYER_PACKET, ProtocolInfo::REMOVE_ACTOR_PACKET,
+		ProtocolInfo::SET_PLAYER_GAME_TYPE_PACKET, ProtocolInfo::ADVENTURE_SETTINGS_PACKET
 	];
 
 	public function receive(DataPacketReceiveEvent $event): void {
@@ -174,16 +175,18 @@ final class PMListener implements Listener {
 				}
 			}
 
-			$pk = new MovePlayerPacket();
-			$pk->entityRuntimeId = $player->getId();
-			$pk->position = $packet->getPosition();
-			$pk->yaw = $packet->getYaw();
-			$pk->headYaw = $packet->getHeadYaw();
-			$pk->pitch = $packet->getPitch();
-			$pk->mode = MovePlayerPacket::MODE_NORMAL;
-			$pk->onGround = true;
-			$pk->tick = $packet->getTick();
-			$player->handleMovePlayer($pk);
+			if ($player->isOnline()) {
+				$pk = new MovePlayerPacket();
+				$pk->entityRuntimeId = $player->getId();
+				$pk->position = $packet->getPosition();
+				$pk->yaw = $packet->getYaw();
+				$pk->headYaw = $packet->getHeadYaw();
+				$pk->pitch = $packet->getPitch();
+				$pk->mode = MovePlayerPacket::MODE_NORMAL;
+				$pk->onGround = true;
+				$pk->tick = $packet->getTick();
+				$player->handleMovePlayer($pk);
+			}
 		}
 		if (!$packet instanceof BatchPacket) {
 			Lumine::getInstance()->socketThread->send(new PlayerSendPacketEvent([

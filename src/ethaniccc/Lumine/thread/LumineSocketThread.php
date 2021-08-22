@@ -8,6 +8,7 @@ use ethaniccc\Lumine\events\SendErrorEvent;
 use ethaniccc\Lumine\events\SocketEvent;
 use ethaniccc\Lumine\events\UnknownEvent;
 use ethaniccc\Lumine\Settings;
+use LumineServer\Server;
 use pocketmine\network\mcpe\NetworkBinaryStream;
 use pocketmine\Thread;
 use pocketmine\utils\BinaryDataException;
@@ -95,16 +96,28 @@ final class LumineSocketThread extends Thread {
 						goto retry_read;
 					}
 				} else {
-					$unpacked = unpack("l", $current)[1];
-					$this->toRead = $unpacked;
-					$this->isAwaitingBuffer = true;
-					goto retry_read;
+					$len = strlen($current);
+					$this->fullBuffer .= $current;
+					if ($len !== $this->toRead) {
+						$this->toRead -= $len;
+						goto retry_read;
+					} else {
+						$unpacked = @unpack("l", $this->fullBuffer)[1];
+						if ($unpacked !== false && $unpacked !== null) {
+							$this->toRead = $unpacked;
+							$this->isAwaitingBuffer = true;
+						} else {
+							$this->logger->info("Unable to unpack read length");
+							goto end;
+						}
+						$this->fullBuffer = "";
+					}
 				}
 			}
 			// now we get everything from the send queue and send stuff to the socket server
 			socket_set_block($sendSocket);
-			/** @var SocketEvent $event */
 			while (($event = $this->sendQueue->shift()) !== null) {
+				$event = igbinary_unserialize($event);
 				$data = (array) $event;
 				$data["name"] = $event::NAME;
 				$write = zlib_encode(igbinary_serialize($data), ZLIB_ENCODING_RAW, 7);
@@ -155,7 +168,7 @@ final class LumineSocketThread extends Thread {
 		if ($this->isKilled) {
 			return;
 		}
-		$this->sendQueue[] = $event;
+		$this->sendQueue[] = igbinary_serialize($event);
 	}
 
 	public function queueReceive(SocketEvent $event): void {
