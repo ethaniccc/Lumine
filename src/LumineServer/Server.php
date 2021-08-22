@@ -29,7 +29,7 @@ final class Server {
 	public int $currentTick = 0;
 	public float $currentTPS = self::TPS;
 
-	public const TPS = 40;
+	public const TPS = 20;
 
 	public static function getInstance(): self {
 		return self::$instance;

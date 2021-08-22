@@ -7,7 +7,8 @@ use Socket;
 final class SocketData {
 
     public function __construct(
-        public Socket $socket,
+    	/** @var resource */
+        public $socket,
         public string $address,
         public float $lastACK
     ) {}
@@ -15,7 +16,9 @@ final class SocketData {
     public int $toRead = 4;
     public bool $isAwaitingBuffer = false;
     /** @var string */
-    public $buffer = "";
+    public $recvBuffer = "";
+	/** @var string */
+    public $sndBuffer = "";
 
     public float $lastRetryTime = 0.0;
 

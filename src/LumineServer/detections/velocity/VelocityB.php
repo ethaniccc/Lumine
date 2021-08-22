@@ -1,6 +1,6 @@
 <?php
 
-namespace LumineServer\detections\movement;
+namespace LumineServer\detections\velocity;
 
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use LumineServer\data\UserData;

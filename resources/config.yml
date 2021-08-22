@@ -28,7 +28,7 @@ kick_message: "{prefix} You were kicked from the server for potential unfair adv
 kick_broadcast: "{prefix} §e{player} §7was kicked for §6{detection} §7(§c{codename}§7)"
 
 detections:
-  Movement:
+  InvalidMovement:
     A:
       enabled: true
       punishment_type: kick
@@ -54,19 +54,27 @@ detections:
       punishment_type: kick
       max_vl: 20
       codename: AHV
-  Combat:
+  Range:
+    A:
+      enabled: true
+      max_dist: 3.05
+      punishment_type: kick
+      max_vl: 25
+      codename: IRD
+  Killaura:
     A:
       enabled: true
       diff: 4
       punishment_type: kick
       max_vl: 10
       codename: NSK
-    B:
+  Autoclicker:
+    A:
       enabled: true
-      max_dist: 3
+      max_cps: 23
       punishment_type: kick
-      max_vl: 20
-      codename: ERD
+      max_vl: 15
+      codename: CLB
   Auth:
     A:
       enabled: true

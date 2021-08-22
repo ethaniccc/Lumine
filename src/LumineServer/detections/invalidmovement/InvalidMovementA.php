@@ -1,16 +1,16 @@
 <?php
 
-namespace LumineServer\detections\movement;
+namespace LumineServer\detections\invalidmovement;
 
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use LumineServer\data\UserData;
 use LumineServer\detections\DetectionModule;
 use pocketmine\network\mcpe\protocol\DataPacket;
 
-final class MovementA extends DetectionModule {
+final class InvalidMovementA extends DetectionModule {
 
 	public function __construct(UserData $data) {
-		parent::__construct($data, "Movement", "A", "Checks if the user's XZ movement is close to the predicted movement");
+		parent::__construct($data, "InvalidMovement", "A", "Checks if the user's XZ movement is close to the predicted movement");
 	}
 
 	public function run(DataPacket $packet): void {
@@ -21,11 +21,12 @@ final class MovementA extends DetectionModule {
 			if ($data->isCollidedHorizontally) {
 				$max = 0.25;
 			}
-			if (($diffVec->x > $max || $diffVec->z > $max) && !$data->isTeleporting) {
+			if (($diffVec->x > $max || $diffVec->z > $max) && !$data->isTeleporting && $data->ticksSinceInLiquid >= 10
+			&& $data->ticksSinceInCobweb >= 10) {
 				if ($this->buff() >= 2) {
 					$this->flag([
-						"x" => round($diffVec->x, 5),
-						"y" => round($diffVec->z, 5)
+						"xD" => round($diffVec->x, 5),
+						"zD" => round($diffVec->z, 5)
 					]);
 				}
 			} else {

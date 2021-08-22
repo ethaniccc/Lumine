@@ -13,16 +13,16 @@ use LumineServer\data\location\LocationMap;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\world\VirtualWorld;
 use LumineServer\detections\auth\AuthA;
+use LumineServer\detections\autoclicker\AutoclickerA;
 use LumineServer\detections\badpackets\BadPacketsA;
-use LumineServer\detections\combat\CombatA;
-use LumineServer\detections\combat\CombatB;
 use LumineServer\detections\DetectionModule;
-use LumineServer\detections\movement\MovementA;
-use LumineServer\detections\movement\MovementB;
-use LumineServer\detections\movement\VelocityA;
-use LumineServer\detections\movement\VelocityB;
+use LumineServer\detections\invalidmovement\InvalidMovementA;
+use LumineServer\detections\invalidmovement\InvalidMovementB;
+use LumineServer\detections\killaura\KillauraA;
+use LumineServer\detections\range\RangeA;
+use LumineServer\detections\velocity\VelocityA;
+use LumineServer\detections\velocity\VelocityB;
 use LumineServer\utils\AABB;
-use pocketmine\block\Block;
 use pocketmine\level\Location;
 use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\protocol\BatchPacket;
@@ -69,6 +69,8 @@ final class UserData {
 	public bool $isJumping = false;
 	public bool $isTeleporting = true;
 	public bool $isImmobile = false;
+	public bool $isFlying = false;
+	public bool $isSurvival = true;
 
 	public float $moveForward = 0.0;
 	public float $moveStrafe = 0.0;
@@ -132,13 +134,20 @@ final class UserData {
 		$this->locationMap = new LocationMap();
 
 		$this->detections = [
-			new MovementA($this),
-			new MovementB($this),
+			new InvalidMovementA($this),
+			new InvalidMovementB($this),
+
 			new VelocityA($this),
 			new VelocityB($this),
-			new CombatA($this),
-			new CombatB($this),
+
+			new RangeA($this),
+
+			new KillauraA($this),
+
+			new AutoclickerA($this),
+
 			new AuthA($this),
+
 			new BadPacketsA($this),
 		];
 

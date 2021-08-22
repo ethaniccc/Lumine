@@ -24,7 +24,7 @@ final class MovementPredictionHandler {
 
 	public function execute(): void {
 		$data = $this->data;
-		if (!$data->isInLoadedChunk || $data->isInVoid || !$data->loggedIn) {
+		if (!$data->isInLoadedChunk || $data->isInVoid || !$data->loggedIn || $data->isImmobile || !$data->isSurvival || $data->isFlying) {
 			$data->onGround = true;
 			$data->expectedOnGround = true;
 			$data->isCollidedVertically = false;
@@ -60,7 +60,7 @@ final class MovementPredictionHandler {
 			}
 		}
 
-		if ($data->isJumping) {
+		if ($data->isJumping && $data->onGround) {
 			$this->jump();
 		}
 

@@ -21,8 +21,8 @@ final class LocationData {
 		$this->lastPos = clone $this->currentPos;
 	}
 
-	public function set(Vector3 $newPos): void {
-		$this->newPosRotationIncrements = 3;
+	public function set(Vector3 $newPos, bool $teleport = false): void {
+		$this->newPosRotationIncrements = $teleport ? 1 : 3;
 		$this->receivedPos = $newPos;
 	}
 

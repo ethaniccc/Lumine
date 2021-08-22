@@ -33,10 +33,12 @@ use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\NetworkBinaryStream;
 use pocketmine\network\mcpe\protocol\AddActorPacket;
 use pocketmine\network\mcpe\protocol\AddPlayerPacket;
+use pocketmine\network\mcpe\protocol\AdventureSettingsPacket;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
 use pocketmine\network\mcpe\protocol\LevelChunkPacket;
+use pocketmine\network\mcpe\protocol\LevelSoundEventPacket;
 use pocketmine\network\mcpe\protocol\LoginPacket;
 use pocketmine\network\mcpe\protocol\MobEffectPacket;
 use pocketmine\network\mcpe\protocol\MoveActorAbsolutePacket;
@@ -49,8 +51,10 @@ use pocketmine\network\mcpe\protocol\RemoveActorPacket;
 use pocketmine\network\mcpe\protocol\SetActorDataPacket;
 use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\SetLocalPlayerAsInitializedPacket;
+use pocketmine\network\mcpe\protocol\SetPlayerGameTypePacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
 use pocketmine\network\mcpe\protocol\types\DeviceOS;
+use pocketmine\network\mcpe\protocol\types\GameMode;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemOnEntityTransactionData;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
@@ -72,6 +76,7 @@ final class PacketHandler {
 
 	public function inbound(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
+		$data->clickData->isClicking = false;
 		if ($packet instanceof PlayerAuthInputPacket) {
 			if ($packet->itemInteractionData !== null) {
 				$data->world->setBlock($packet->itemInteractionData->blockPos, 0, 0);
@@ -96,6 +101,7 @@ final class PacketHandler {
 			}
 
 			$data->jumpVelocity = MovementConstants::DEFAULT_JUMP_MOTION;
+			$data->gravity = MovementConstants::NORMAL_GRAVITY;
 
 			foreach ($data->effects as $effectData) {
 				$effectData->ticks--;
@@ -228,6 +234,8 @@ final class PacketHandler {
 						}
 					}
 				}
+			} elseif ($packet instanceof UseItemOnEntityTransactionData) {
+				$data->clickData->add($data->currentTick);
 			}
 		} elseif ($packet instanceof LoginPacket) {
 			try {
@@ -240,6 +248,10 @@ final class PacketHandler {
 				$data->authData = new AuthData("UNKNOWN", "UNKNOWN", TextFormat::clean($packet->clientData["ThirdPartyName"]), "UNKNOWN");
 			}
 			$data->playerOS = $packet->clientData["DeviceOS"];
+		} elseif ($packet instanceof AdventureSettingsPacket) {
+			$data->isFlying = $packet->getFlag(AdventureSettingsPacket::FLYING);
+		} elseif ($packet instanceof LevelSoundEventPacket && $packet->sound === LevelSoundEventPacket::SOUND_ATTACK_NODAMAGE) {
+			$data->clickData->add($data->currentTick);
 		}
 
 		foreach ($data->detections as $detection) {
@@ -325,6 +337,7 @@ final class PacketHandler {
 					}
 				} elseif ($packet instanceof StartGamePacket) {
 					$data->entityRuntimeId = $packet->entityRuntimeId;
+					$data->isSurvival = ($packet->playerGamemode === GameMode::SURVIVAL || $packet->playerGamemode === GameMode::ADVENTURE);
 				}
 			}
 		}
@@ -412,6 +425,14 @@ final class PacketHandler {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				$data->locationMap->remove($packet->entityUniqueId);
 			});
+		} elseif ($packet instanceof SetPlayerGameTypePacket) {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
+				$data->isSurvival = ($packet->gamemode === GameMode::SURVIVAL || $packet->gamemode === GameMode::ADVENTURE);
+			});
+		} elseif ($packet instanceof AdventureSettingsPacket) {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
+				// TODO?
+			});
 		} elseif ($packet instanceof BatchPacket) {
 			// The only batch packet that will ever be here is a packet full of entity locations.
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
@@ -419,11 +440,15 @@ final class PacketHandler {
 				while (!$stream->feof()) {
 					$pk = PacketPool::getPacket($stream->getString());
 					$pk->decode();
-					if ($pk instanceof MovePlayerPacket || $pk instanceof MoveActorAbsolutePacket) {
+					if ($pk instanceof MoveActorAbsolutePacket || $pk instanceof MovePlayerPacket) {
 						$target = $data->locationMap->get($pk->entityRuntimeId);
 						if ($target !== null) {
-							$position = $pk instanceof MovePlayerPacket ? $pk->position->subtract(0, 1.62) : $pk->position;
-							$target->set($position);
+							if ($pk instanceof MoveActorAbsolutePacket) {
+								$teleport = $pk->flags >= 2;
+							} else {
+								$teleport = $pk->mode = MovePlayerPacket::MODE_TELEPORT;
+							}
+							$target->set($pk->position->subtract(0, 1.62), $teleport);
 						}
 					}
 				}

@@ -1,21 +1,20 @@
 <?php
 
-namespace LumineServer\detections\combat;
+namespace LumineServer\detections\killaura;
 
 use LumineServer\data\UserData;
 use LumineServer\detections\DetectionModule;
-use pocketmine\inventory\Inventory;
 use pocketmine\network\mcpe\protocol\AnimatePacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\InventoryTransactionPacket;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemOnEntityTransactionData;
 
-final class CombatA extends DetectionModule {
+final class KillauraA extends DetectionModule {
 
     private int $lastSwingTick = 0;
 
     public function __construct(UserData $data) {
-        parent::__construct($data, "Combat", "A", "Checks if the player is swinging their arm while attacking an entity");
+        parent::__construct($data, "Killaura", "A", "Checks if the player is swinging their arm while attacking an entity");
     }
 
     public function run(DataPacket $packet): void {

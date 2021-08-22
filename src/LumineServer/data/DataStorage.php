@@ -2,6 +2,8 @@
 
 namespace LumineServer\data;
 
+use LumineServer\Server;
+
 final class DataStorage {
 
 	/** @var array
