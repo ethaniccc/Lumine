@@ -24,7 +24,7 @@ final class MovementPredictionHandler {
 
 	public function execute(): void {
 		$data = $this->data;
-		if (!$data->isInLoadedChunk || $data->isInVoid || !$data->loggedIn || $data->isImmobile || !$data->isSurvival || $data->isFlying) {
+		if (!$data->isInLoadedChunk || $data->isInVoid || !$data->loggedIn || $data->isImmobile || !$data->isSurvival || $data->isFlying || $data->ticksSinceSpawn < 10) {
 			$data->onGround = true;
 			$data->expectedOnGround = true;
 			$data->isCollidedVertically = false;
@@ -47,7 +47,6 @@ final class MovementPredictionHandler {
 		$strafe = $data->moveStrafe;
 
 		if ($data->ticksSinceMotion === 0) {
-			// $data->message("({$data->currentTick}) motion taken");
 			$data->serverPredictedMotion = clone $data->serverSentMotion;
 			if ($data->isJumping) {
 				$motion->y = $data->jumpVelocity;
@@ -129,11 +128,13 @@ final class MovementPredictionHandler {
 		 * HACK: This is a hack to compensate for some weird behavior where Minecraft will think
 		 * it's still collided vertically for an extra tick after teleporting.
 		 */
-		if ($this->teleportOffsetFuckery > 0 && !$data->isJumping) {
+		if ($this->teleportOffsetFuckery > 0) {
 			$motion->y = $data->serverSentMotion->y;
 			if ($data->isJumping) {
 				$motion->y = $data->jumpVelocity;
+				$this->teleportOffsetFuckery = 1;
 			}
+			$data->onGround = true;
 			--$this->teleportOffsetFuckery;
 		}
 

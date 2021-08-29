@@ -23,6 +23,7 @@ use pocketmine\block\Ladder;
 use pocketmine\block\Liquid;
 use pocketmine\block\UnknownBlock;
 use pocketmine\block\Vine;
+use pocketmine\entity\Attribute;
 use pocketmine\entity\Effect;
 use pocketmine\entity\Entity;
 use pocketmine\level\Level;
@@ -48,6 +49,7 @@ use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\RemoveActorPacket;
+use pocketmine\network\mcpe\protocol\RespawnPacket;
 use pocketmine\network\mcpe\protocol\SetActorDataPacket;
 use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\SetLocalPlayerAsInitializedPacket;
@@ -57,6 +59,7 @@ use pocketmine\network\mcpe\protocol\types\DeviceOS;
 use pocketmine\network\mcpe\protocol\types\GameMode;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemOnEntityTransactionData;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
+use pocketmine\network\mcpe\protocol\UpdateAttributesPacket;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
 use pocketmine\utils\BinaryStream;
 use pocketmine\utils\TextFormat;
@@ -188,6 +191,10 @@ final class PacketHandler {
 				$data->ticksOnGround = 0;
 			}
 
+			$data->isAlive ?
+				$data->ticksSinceSpawn++ :
+				$data->ticksSinceSpawn = 0;
+
 			$data->locationMap->tick();
 			$data->currentTick++;
 
@@ -199,7 +206,7 @@ final class PacketHandler {
 					if ($tickDiff > 300 && $data->waitingACKCount >= 40) {
 						$data->disconnect(Server::getInstance()->settings->get(
 							"timeout_message",
-							"NetworkStackLatency timeout\nPlease contact a staff member if this issue persists"
+							"NetworkStackLatency timeout (d=$tickDiff c={$data->waitingACKCount})\nPlease contact a staff member if this issue persists"
 						));
 					}
 				} else {
@@ -208,6 +215,7 @@ final class PacketHandler {
 			}
 		} elseif ($packet instanceof SetLocalPlayerAsInitializedPacket) {
 			$data->loggedIn = true;
+			$data->isAlive = true;
 			$data->entityRuntimeId = $packet->entityRuntimeId;
 		} elseif ($packet instanceof NetworkStackLatencyPacket) {
 			$data->latencyManager->execute($packet->timestamp, $timestamp);
@@ -252,6 +260,8 @@ final class PacketHandler {
 			$data->isFlying = $packet->getFlag(AdventureSettingsPacket::FLYING);
 		} elseif ($packet instanceof LevelSoundEventPacket && $packet->sound === LevelSoundEventPacket::SOUND_ATTACK_NODAMAGE) {
 			$data->clickData->add($data->currentTick);
+		} elseif ($packet instanceof RespawnPacket && $packet->entityRuntimeId === $data->entityRuntimeId && $packet->respawnState === RespawnPacket::CLIENT_READY_TO_SPAWN) {
+			$data->isAlive = true;
 		}
 
 		foreach ($data->detections as $detection) {
@@ -279,7 +289,8 @@ final class PacketHandler {
 					}
 				} elseif ($pk instanceof NetworkChunkPublisherUpdatePacket) {
 					$data->latencyManager->sandwich(function (float $timestamp) use ($data, $pk): void {
-						$toRemove = $data->world->getAllChunks();
+						$toRemove = array_keys($data->world->getAllChunks());
+						$removeList = [];
 						$centerX = $pk->x >> 4;
 						$centerZ = $pk->z >> 4;
 						$radius = $pk->radius / 16;
@@ -290,41 +301,42 @@ final class PacketHandler {
 								}
 								$index = Level::chunkHash($centerX + $x, $centerZ + $z);
 								if ($data->world->isValidChunk($index)) {
-									unset($toRemove[$index]);
+									$removeList[] = $index;
 								}
 								$index = Level::chunkHash($centerX - $x - 1, $centerZ + $z);
 								if ($data->world->isValidChunk($index)) {
-									unset($toRemove[$index]);
+									$removeList[] = $index;
 								}
 								$index = Level::chunkHash($centerX + $x, $centerZ - $z - 1);
 								if ($data->world->isValidChunk($index)) {
-									unset($toRemove[$index]);
+									$removeList[] = $index;
 								}
 								$index = Level::chunkHash($centerX - $x - 1, $centerZ - $z - 1);
 								if ($data->world->isValidChunk($index)) {
-									unset($toRemove[$index]);
+									$removeList[] = $index;
 								}
 								if ($x !== $z) {
 									$index = Level::chunkHash($centerX + $z, $centerZ + $x);
 									if ($data->world->isValidChunk($index)) {
-										unset($toRemove[$index]);
+										$removeList[] = $index;
 									}
 									$index = Level::chunkHash($centerX - $z - 1, $centerZ + $x);
 									if ($data->world->isValidChunk($index)) {
-										unset($toRemove[$index]);
+										$removeList[] = $index;
 									}
 									$index = Level::chunkHash($centerX + $z, $centerZ - $x - 1);
 									if ($data->world->isValidChunk($index)) {
-										unset($toRemove[$index]);
+										$removeList[] = $index;
 									}
 									$index = Level::chunkHash($centerX - $z - 1, $centerZ - $x - 1);
 									if ($data->world->isValidChunk($index)) {
-										unset($toRemove[$index]);
+										$removeList[] = $index;
 									}
 								}
 							}
 						}
-						foreach (array_keys($toRemove) as $hash) {
+						$toRemove = array_diff($toRemove, $removeList);
+						foreach ($toRemove as $hash) {
 							$data->world->removeChunkByHash($hash);
 						}
 					}, $pk);
@@ -432,6 +444,14 @@ final class PacketHandler {
 		} elseif ($packet instanceof AdventureSettingsPacket) {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				// TODO?
+			});
+		} elseif ($packet instanceof UpdateAttributesPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {
+			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
+				foreach ($packet->entries as $attribute) {
+					if ($attribute->getId() === Attribute::HEALTH && $attribute->getValue() <= 0) {
+						$data->isAlive = false;
+					}
+				}
 			});
 		} elseif ($packet instanceof BatchPacket) {
 			// The only batch packet that will ever be here is a packet full of entity locations.

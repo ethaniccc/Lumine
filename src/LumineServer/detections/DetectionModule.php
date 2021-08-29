@@ -74,7 +74,7 @@ abstract class DetectionModule {
 				$i++;
 			}
 		}
-		Server::getInstance()->logger->log("[{$this->data->authData->username} @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]");
+		Server::getInstance()->logger->log("[{$this->data->authData->username} ({$this->data->currentTick}) @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]");
 	}
 
 	protected function buff(float $amount = 1): float {

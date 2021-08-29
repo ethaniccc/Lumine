@@ -56,6 +56,7 @@ final class UserData {
 	public int $ticksSinceInLiquid = 0;
 	public int $ticksSinceInCobweb = 0;
 	public int $ticksSinceInClimbable = 0;
+	public int $ticksSinceSpawn = 0;
 
 	public bool $onGround = true;
 	public bool $lastOnGround = true;
@@ -71,6 +72,7 @@ final class UserData {
 	public bool $isImmobile = false;
 	public bool $isFlying = false;
 	public bool $isSurvival = true;
+	public bool $isAlive = false;
 
 	public float $moveForward = 0.0;
 	public float $moveStrafe = 0.0;

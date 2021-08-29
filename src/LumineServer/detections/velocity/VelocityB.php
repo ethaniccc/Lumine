@@ -25,6 +25,8 @@ final class VelocityB extends DetectionModule {
 					"xPct" => round($xPct, 5),
 					"zPct" => round($zPct, 5)
 				]);
+			} else {
+				$this->violations = max($this->violations - 0.05, 0);
 			}
 		}
 	}

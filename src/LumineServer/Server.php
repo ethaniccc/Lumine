@@ -2,6 +2,7 @@
 
 namespace LumineServer;
 
+use LumineServer\blocks\WoodenFenceOverride;
 use LumineServer\data\DataStorage;
 use LumineServer\detections\DetectionModule;
 use LumineServer\socket\SocketHandler;
@@ -26,6 +27,7 @@ final class Server {
 	public DataStorage $dataStorage;
 	public Settings $settings;
 	public bool $running = true;
+	public bool $performanceLogging = false;
 	public int $currentTick = 0;
 	public float $currentTPS = self::TPS;
 
@@ -55,7 +57,9 @@ final class Server {
 		$this->console = new CommandThread($consoleNotifier);
 		$this->tickSleeper->addNotifier($consoleNotifier, function (): void {
 			while (($line = $this->console->getLine()) !== null) {
-				switch ($line) {
+				$args = explode(" ", $line);
+				$command = array_shift($args);
+				switch ($command) {
 					case "stop":
 						$this->shutdown();
 						break;
@@ -63,6 +67,24 @@ final class Server {
 						$this->logger->log("Server status:");
 						$this->logger->log("TPS=" . round($this->currentTPS, 2));
 						$this->logger->log("Memory usage=" . round(memory_get_usage() / 1e+6, 4) . "MB");
+						break;
+					case "logperf":
+						$sub = $args[0] ?? null;
+						switch ($sub) {
+							case null:
+								$this->logger->log("No arguments supplied for the performance logging command", false);
+								break;
+							case "on":
+							case "enable":
+								$this->performanceLogging = true;
+								$this->logger->log("Performance logging has been enabled");
+								break;
+							case "off":
+							case "disable":
+								$this->performanceLogging = false;
+								$this->logger->log("Performance logging has been disabled");
+								break;
+						}
 						break;
 					case "clear":
 						echo str_repeat(PHP_EOL, 50);
@@ -79,6 +101,7 @@ final class Server {
 		PacketPool::init();
 		ItemFactory::init();
 		BlockFactory::init();
+		BlockFactory::registerBlock(new WoodenFenceOverride(), true);
 		DetectionModule::init();
 		MCMathHelper::init();
 		$this->logger->log("Initialized needed data");
@@ -92,6 +115,12 @@ final class Server {
 			$this->socketHandler->tick();
 			$delta = microtime(true) - $start;
 			$this->currentTPS = min(self::TPS, 1 / max(0.0001, $delta));
+			if ($this->performanceLogging) {
+				$cpu = function_exists("sys_getloadavg") ? sys_getloadavg()[0] : "N/A";
+				$memory = round(memory_get_usage() / 1e+6, 4) . "MB";
+				$load = round($delta / (1 / $this->currentTPS), 5) * 100;
+				$this->logger->log("CPU=$cpu% Memory=$memory Load=$load%", false);
+			}
 			if ($delta <= 1 / self::TPS) {
 				$this->tickSleeper->sleepUntil(microtime(true) + (1 / self::TPS) - $delta);
 			} else {
