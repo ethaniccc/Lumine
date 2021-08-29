@@ -36,7 +36,8 @@ final class PMListener implements Listener {
 		ProtocolInfo::SET_ACTOR_MOTION_PACKET, ProtocolInfo::UPDATE_BLOCK_PACKET, ProtocolInfo::MOB_EFFECT_PACKET,
 		ProtocolInfo::MOVE_PLAYER_PACKET, ProtocolInfo::SET_ACTOR_DATA_PACKET, ProtocolInfo::MOVE_ACTOR_ABSOLUTE_PACKET,
 		ProtocolInfo::ADD_ACTOR_PACKET, ProtocolInfo::ADD_PLAYER_PACKET, ProtocolInfo::REMOVE_ACTOR_PACKET,
-		ProtocolInfo::SET_PLAYER_GAME_TYPE_PACKET, ProtocolInfo::ADVENTURE_SETTINGS_PACKET
+		ProtocolInfo::SET_PLAYER_GAME_TYPE_PACKET, ProtocolInfo::ADVENTURE_SETTINGS_PACKET, ProtocolInfo::UPDATE_ATTRIBUTES_PACKET,
+		ProtocolInfo::RESPAWN_PACKET
 	];
 
 	public function receive(DataPacketReceiveEvent $event): void {
