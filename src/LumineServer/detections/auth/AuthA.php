@@ -42,9 +42,10 @@ final class AuthA extends DetectionModule {
 					$expectedOS = DeviceOS::IOS;
 					break;
 				default:
-					Server::getInstance()->logger->log("Unknown TitleID from " . TextFormat::clean($packet->username) . " (titleID=$titleID os=$givenOS)");
+					Server::getInstance()->logger->log("Unknown TitleID from " . TextFormat::clean($packet->username) . " (titleID={$data->authData->titleID} os={$data->playerOS})");
 					return;
 			}
+			Server::getInstance()->logger->log("{$data->authData->username} @ AuthA: expected=$expectedOS got={$data->playerOS} titleID={$data->authData->titleID}");
 			if ($data->playerOS !== $expectedOS) {
 				$this->flag([
 					"expectedOS" => $expectedOS,

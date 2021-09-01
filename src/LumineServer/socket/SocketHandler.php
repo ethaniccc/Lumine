@@ -107,7 +107,7 @@ final class SocketHandler {
 		$toRemove = false;
 		$times = 0;
 		retry_read:
-		$current = socket_read($client->socket, $client->toRead);
+		$current = @socket_read($client->socket, $client->toRead);
 		if ($current === "") {
 			$error = socket_last_error($client->socket);
 			if ($error !== 0) {

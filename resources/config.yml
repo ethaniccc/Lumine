@@ -15,7 +15,7 @@
 #  Proprietary and confidential
 #  Written by Benjamin <schooldocumentsandstuff@gmail.com> on July, 2021
 
-bind_address: "10.128.0.3"
+bind_address: "0.0.0.0"
 server_port: 3001
 memory_limit: 2048M
 
@@ -39,6 +39,11 @@ detections:
       punishment_type: kick
       max_vl: 50
       codename: IMV
+    C:
+      enabled: true
+      punishment_type: kick
+      max_vl: 10
+      codename: IJT
   Velocity:
     A:
       enabled: true
@@ -75,6 +80,11 @@ detections:
       punishment_type: kick
       max_vl: 15
       codename: CLB
+    B:
+      enabled: true
+      punishment_type: kick
+      max_vl: 10
+      codename: NDC
   Auth:
     A:
       enabled: true

@@ -14,10 +14,12 @@ use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\world\VirtualWorld;
 use LumineServer\detections\auth\AuthA;
 use LumineServer\detections\autoclicker\AutoclickerA;
+use LumineServer\detections\autoclicker\AutoclickerB;
 use LumineServer\detections\badpackets\BadPacketsA;
 use LumineServer\detections\DetectionModule;
 use LumineServer\detections\invalidmovement\InvalidMovementA;
 use LumineServer\detections\invalidmovement\InvalidMovementB;
+use LumineServer\detections\invalidmovement\InvalidMovementC;
 use LumineServer\detections\killaura\KillauraA;
 use LumineServer\detections\range\RangeA;
 use LumineServer\detections\velocity\VelocityA;
@@ -138,6 +140,7 @@ final class UserData {
 		$this->detections = [
 			new InvalidMovementA($this),
 			new InvalidMovementB($this),
+			new InvalidMovementC($this),
 
 			new VelocityA($this),
 			new VelocityB($this),
@@ -147,6 +150,7 @@ final class UserData {
 			new KillauraA($this),
 
 			new AutoclickerA($this),
+			new AutoclickerB($this),
 
 			new AuthA($this),
 
