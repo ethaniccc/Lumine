@@ -17,6 +17,8 @@ abstract class SocketEvent {
 	public const LAG_COMPENSATION = "player:lag_compensation";
 	public const INIT_DATA = "socket:init_data";
 	public const ALERT_NOTIFICATION = "server:alert_notification";
+	public const COMMAND_REQUEST = "command:request";
+	public const COMMAND_RESPONSE = "command:response";
 
 	public static function get(array $data): SocketEvent {
 		switch ($data["name"] ?? "ERR_NO_NAME") {
@@ -42,6 +44,10 @@ abstract class SocketEvent {
 				return new InitDataEvent($data);
 			case self::ALERT_NOTIFICATION:
 				return new AlertNotificationEvent($data);
+			case self::COMMAND_REQUEST:
+				return new CommandRequestEvent($data);
+			case self::COMMAND_RESPONSE:
+				return new CommandResponseEvent($data);
 			default:
 				return new UnknownEvent($data);
 		}

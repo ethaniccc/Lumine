@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace ethaniccc\Lumine;
 
+use ethaniccc\Lumine\commands\LumineCommand;
 use ethaniccc\Lumine\data\DataCache;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use ethaniccc\Lumine\events\InitDataEvent;
@@ -54,6 +55,7 @@ class Lumine extends PluginBase {
 		$this->task = new TickingTask();
 		$this->getScheduler()->scheduleRepeatingTask($this->task, 1);
 		$this->cache = new DataCache();
+		$this->getServer()->getCommandMap()->register($this->getName(), new LumineCommand());
 	}
 
 }

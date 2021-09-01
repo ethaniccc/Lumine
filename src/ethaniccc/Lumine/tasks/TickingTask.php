@@ -3,6 +3,7 @@
 namespace ethaniccc\Lumine\tasks;
 
 use ethaniccc\Lumine\events\AlertNotificationEvent;
+use ethaniccc\Lumine\events\CommandResponseEvent;
 use ethaniccc\Lumine\events\ConnectionErrorEvent;
 use ethaniccc\Lumine\events\HeartbeatEvent;
 use ethaniccc\Lumine\events\LagCompensationEvent;
@@ -64,9 +65,16 @@ final class TickingTask extends Task {
 						$player->dataPacket($event->alertPacket);
 					}
 				}
-			} /* elseif ($event instanceof HeartbeatEvent) {
-				Lumine::getInstance()->getLogger()->info("Received heartbeat from the remote socket server.");
-			} */
+			} elseif ($event instanceof CommandResponseEvent) {
+				if ($event->target === "CONSOLE") {
+					Lumine::getInstance()->getLogger()->info($event->response);
+				} else {
+					$player = Lumine::getInstance()->cache->identify($event->target);
+					if ($player !== null) {
+						$player->sendMessage($event->response);
+					}
+				}
+			}
 		}
 	}
 
