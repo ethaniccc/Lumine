@@ -2,7 +2,10 @@
 
 namespace LumineServer\socket;
 
+use LumineServer\data\UserData;
 use LumineServer\events\AddUserDataEvent;
+use LumineServer\events\CommandRequestEvent;
+use LumineServer\events\CommandResponseEvent;
 use LumineServer\events\HeartbeatEvent;
 use LumineServer\events\InitDataEvent;
 use LumineServer\events\LagCompensationEvent;
@@ -16,6 +19,7 @@ use LumineServer\Server;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\utils\BinaryStream;
+use pocketmine\utils\TextFormat;
 use ReflectionClass;
 use Socket;
 
@@ -25,9 +29,6 @@ final class SocketHandler {
 	public Socket $socket;
 	/** @var SocketData[] */
 	public array $clients = [];
-	public array $retryQueue = [];
-
-	public const ENCRYPTION_METHOD = "AES-256-CBC";
 
 	public function __construct(int $port) {
 		$this->port = $port;
@@ -182,6 +183,72 @@ final class SocketHandler {
 									$reflection->setStaticPropertyValue("legacyToRuntimeMap", unserialize($event->extraData["legacyToRuntimeMap"]));
 									Server::getInstance()->logger->log("RuntimeBlockMapping was initialized");
 								}
+							}
+						} elseif ($event instanceof CommandRequestEvent) {
+							switch ($event->commandType) {
+								case "logs":
+									$targetPlayer = array_shift($event->args);
+									if ($targetPlayer === null) {
+										$this->send(new CommandResponseEvent([
+											"target" => $event->sender,
+											"response" => TextFormat::RED . "You need to specify a player to obtain logs"
+										]), $client->address);
+									} else {
+										/** @var string|null $found */
+										$found = null;
+										$name = strtolower($targetPlayer);
+										$delta = PHP_INT_MAX;
+										foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
+											foreach ($queue as $otherData) {
+												/** @var UserData $otherData */
+												$username = $otherData->authData->username;
+												if(stripos($username, $name) === 0){
+													$curDelta = strlen($username) - strlen($name);
+													if($curDelta < $delta){
+														$found = $username;
+														$delta = $curDelta;
+													}
+													if($curDelta === 0){
+														break;
+													}
+												}
+											}
+										}
+										if ($found === null) {
+											$this->send(new CommandResponseEvent([
+												"target" => $event->sender,
+												"response" => TextFormat::RED . "The specified player was not found"
+											]), $client->address);
+										} else {
+											$message = "";
+											$times = 1;
+											foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
+												foreach ($queue as $otherData) {
+													if ($otherData->authData->username === $found) {
+														$message .= TextFormat::GOLD . "Server " . TextFormat::GRAY . "(" . TextFormat::YELLOW . $times . TextFormat::GRAY . "):" . PHP_EOL;
+														$logs = 0;
+														foreach ($otherData->detections as $detection) {
+															if ($detection->violations >= 2) {
+																$message .= TextFormat::AQUA . "(" . TextFormat::LIGHT_PURPLE . var_export(round($detection->violations, 2), true) . TextFormat::AQUA . ") ";
+																$message .= TextFormat::GRAY . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GRAY . ") ";
+																$message .= TextFormat::DARK_GRAY . "- " . TextFormat::GOLD . $detection->description . PHP_EOL;
+																$logs++;
+															}
+														}
+														if ($logs === 0) {
+															$message .= TextFormat::GREEN . "No logs found for {$otherData->authData->username}" . PHP_EOL;
+														}
+														$times++;
+													}
+												}
+											}
+											$this->send(new CommandResponseEvent([
+												"target" => $event->sender,
+												"response" => $message
+											]), $client->address);
+										}
+									}
+									break;
 							}
 						} elseif ($event instanceof UnknownEvent) {
 							Server::getInstance()->logger->log("Got unknown event ({$event->name})");
