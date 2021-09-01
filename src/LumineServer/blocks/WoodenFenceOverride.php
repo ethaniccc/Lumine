@@ -15,7 +15,7 @@ class WoodenFenceOverride extends WoodenFence {
 	protected function recalculateBoundingBox(): ?AxisAlignedBB {
 		$width = 0.5 - $this->getThickness() / 2;
 
-		return new AxisAlignedBB($this->x + ($this->canConnect($this->getSide(Vector3::SIDE_WEST)) ? 0 : $width), $this->y, $this->z + ($this->canConnect($this->getSide(Vector3::SIDE_NORTH)) ? 0 : $width), $this->x + 1 - ($this->canConnect($this->getSide(Vector3::SIDE_EAST)) ? 0 : $width), $this->y + 1.5 + 0.0625, $this->z + 1 - ($this->canConnect($this->getSide(Vector3::SIDE_SOUTH)) ? 0 : $width));
+		return new AxisAlignedBB($this->x + ($this->canConnect($this->getSide(Vector3::SIDE_WEST)) ? 0 : $width), $this->y, $this->z + ($this->canConnect($this->getSide(Vector3::SIDE_NORTH)) ? 0 : $width), $this->x + 1 - ($this->canConnect($this->getSide(Vector3::SIDE_EAST)) ? 0 : $width), $this->y + 1.5, $this->z + 1 - ($this->canConnect($this->getSide(Vector3::SIDE_SOUTH)) ? 0 : $width));
 	}
 
 	protected function recalculateCollisionBoxes(): array {
@@ -29,7 +29,7 @@ class WoodenFenceOverride extends WoodenFence {
 
 		if ($connectWest or $connectEast) {
 			//X axis (west/east)
-			$bbs[] = new AxisAlignedBB($this->x + ($connectWest ? 0 : $inset), $this->y, $this->z + $inset, $this->x + 1 - ($connectEast ? 0 : $inset), $this->y + 1.5 + 0.0625, $this->z + 1 - $inset);
+			$bbs[] = new AxisAlignedBB($this->x + ($connectWest ? 0 : $inset), $this->y, $this->z + $inset, $this->x + 1 - ($connectEast ? 0 : $inset), $this->y + 1.5 , $this->z + 1 - $inset);
 		}
 
 		$connectNorth = $this->canConnect($this->getSide(Vector3::SIDE_NORTH));
@@ -37,12 +37,12 @@ class WoodenFenceOverride extends WoodenFence {
 
 		if ($connectNorth or $connectSouth) {
 			//Z axis (north/south)
-			$bbs[] = new AxisAlignedBB($this->x + $inset, $this->y, $this->z + ($connectNorth ? 0 : $inset), $this->x + 1 - $inset, $this->y + 1.5 + 0.0625, $this->z + 1 - ($connectSouth ? 0 : $inset));
+			$bbs[] = new AxisAlignedBB($this->x + $inset, $this->y, $this->z + ($connectNorth ? 0 : $inset), $this->x + 1 - $inset, $this->y + 1.5 , $this->z + 1 - ($connectSouth ? 0 : $inset));
 		}
 
 		if (count($bbs) === 0) {
 			//centre post AABB (only needed if not connected on any axis - other BBs overlapping will do this if any connections are made)
-			return [new AxisAlignedBB($this->x + $inset, $this->y, $this->z + $inset, $this->x + 1 - $inset, $this->y + 1.5 + 0.0625, $this->z + 1 - $inset)];
+			return [new AxisAlignedBB($this->x + $inset, $this->y, $this->z + $inset, $this->x + 1 - $inset, $this->y + 1.5 , $this->z + 1 - $inset)];
 		}
 
 		return $bbs;

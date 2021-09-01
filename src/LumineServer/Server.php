@@ -101,7 +101,7 @@ final class Server {
 		PacketPool::init();
 		ItemFactory::init();
 		BlockFactory::init();
-		BlockFactory::registerBlock(new WoodenFenceOverride(), true);
+		//BlockFactory::registerBlock(new WoodenFenceOverride(), true);
 		DetectionModule::init();
 		MCMathHelper::init();
 		$this->logger->log("Initialized needed data");
