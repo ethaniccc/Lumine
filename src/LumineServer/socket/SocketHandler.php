@@ -93,7 +93,7 @@ final class SocketHandler {
 		$buffer = pack("l", strlen($write)) . $write;
 		$len = strlen($buffer);
 		retry_send:
-		$res = socket_write($client->socket, $buffer);
+		$res = @socket_write($client->socket, $buffer);
 		if ($res === false) {
 			@socket_close($client->socket);
 			unset($this->clients[$client->address]);

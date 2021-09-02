@@ -79,6 +79,9 @@ final class PacketHandler {
 
 	public function inbound(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
+		if ($data->isClosed) {
+			return;
+		}
 		$data->clickData->isClicking = false;
 		if ($packet instanceof PlayerAuthInputPacket) {
 			if ($packet->itemInteractionData !== null) {
@@ -273,6 +276,9 @@ final class PacketHandler {
 
 	public function outbound(BatchPacket $packet, float $timestamp): void {
 		$data = $this->data;
+		if ($data->isClosed) {
+			return;
+		}
 		$packet->decode();
 		foreach ($packet->getPackets() as $buffer) {
 			$pk = PacketPool::getPacket($buffer);
@@ -357,6 +363,9 @@ final class PacketHandler {
 
 	public function compensate(LagCompensationEvent $event): void {
 		$data = $this->data;
+		if ($data->isClosed) {
+			return;
+		}
 		$packet = $event->packet;
 		$timestamp = $event->timestamp;
 		if ($packet instanceof SetActorMotionPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {

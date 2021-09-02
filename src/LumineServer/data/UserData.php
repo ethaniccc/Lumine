@@ -40,6 +40,7 @@ final class UserData {
 	public int $entityRuntimeId = -1;
 	public int $latency = -1;
 	public bool $loggedIn = false;
+	public bool $isClosed = false;
 
 	public Location $currentPos;
 	public Location $lastPos;
@@ -197,6 +198,7 @@ final class UserData {
 		$packet = new DisconnectPacket();
 		$packet->message = $message;
 		$this->queue($packet);
+		$this->isClosed = true;
 	}
 
 	public function destroy(): void {
