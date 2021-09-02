@@ -47,12 +47,10 @@ final class PMListener implements Listener {
 	 * @priority LOWEST
 	 */
 	public function prelog(PlayerPreLoginEvent $event): void {
-		foreach (Server::getInstance()->getNameBans()->getEntries() as $entry) {
-			if ($entry->getSource() === 'Lumine AC' && $entry->getName() === strtolower($event->getPlayer()->getName()) && !$entry->hasExpired()) {
-				$event->setCancelled();
-				$event->setKickMessage($entry->getReason());
-				break;
-			}
+		$entry = Server::getInstance()->getNameBans()->getEntry($event->getPlayer()->getName());
+		if ($entry !== null && $entry->getSource() === 'Lumine AC' && $entry->getName() === strtolower($event->getPlayer()->getName())) {
+			$event->setCancelled();
+			$event->setKickMessage($entry->getReason());
 		}
 		if ($event->isCancelled()) {
 			Lumine::getInstance()->cache->remove($event->getPlayer());
