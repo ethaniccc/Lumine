@@ -30,7 +30,7 @@ kick_broadcast: "{prefix} §e{player} §7was kicked for §6{detection} §7(§c{c
 
 # E.G - "100 years 100 months 100 days 100 hours 100 minutes 100 seconds"
 # E.G - "2 years 1 month 1 minute 1 second"
-ban_expiration: "1 minute"
+ban_expiration: "7 days"
 # Tags: {prefix}, {codename}, {expiration}
 ban_message: "{prefix} You were banned from the server for potential unfair advantage (code={codename})\nYour ban expires {expiration}\nPlease contact staff if this action was done in error."
 # Tags: {prefix}, {player}, {codename}, {detection}
@@ -40,12 +40,12 @@ detections:
   InvalidMovement:
     A:
       enabled: true
-      punishment_type: ban
+      punishment_type: kick
       max_vl: 50
       codename: IMH
     B:
       enabled: true
-      punishment_type: ban
+      punishment_type: kick
       max_vl: 50
       codename: IMV
     C:
