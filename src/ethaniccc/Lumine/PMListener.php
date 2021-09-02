@@ -9,6 +9,7 @@ use ethaniccc\Lumine\events\LagCompensationEvent;
 use ethaniccc\Lumine\events\PlayerSendPacketEvent;
 use ethaniccc\Lumine\events\ServerSendPacketEvent;
 use pocketmine\event\Listener;
+use pocketmine\event\player\PlayerPreLoginEvent;
 use pocketmine\event\player\PlayerQuitEvent;
 use pocketmine\event\server\DataPacketReceiveEvent;
 use pocketmine\event\server\DataPacketSendEvent;
@@ -23,6 +24,7 @@ use pocketmine\network\mcpe\protocol\StartGamePacket;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementSettings;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementType;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
+use pocketmine\Server;
 use pocketmine\tile\Spawnable;
 use pocketmine\utils\Binary;
 
@@ -40,9 +42,30 @@ final class PMListener implements Listener {
 		ProtocolInfo::RESPAWN_PACKET
 	];
 
+	/**
+	 * @param PlayerPreLoginEvent $event
+	 * @priority LOWEST
+	 */
+	public function prelog(PlayerPreLoginEvent $event): void {
+		foreach (Server::getInstance()->getNameBans()->getEntries() as $entry) {
+			if ($entry->getSource() === 'Lumine AC' && $entry->getName() === strtolower($event->getPlayer()->getName()) && !$entry->hasExpired()) {
+				$event->setCancelled();
+				$event->setKickMessage($entry->getReason());
+				break;
+			}
+		}
+		if ($event->isCancelled()) {
+			Lumine::getInstance()->cache->remove($event->getPlayer());
+		}
+	}
+
 	public function receive(DataPacketReceiveEvent $event): void {
 		$player = $event->getPlayer();
 		$packet = $event->getPacket();
+		if (!$player->isConnected()) {
+			Lumine::getInstance()->cache->remove($event->getPlayer());
+			return;
+		}
 		if (!Lumine::getInstance()->cache->exists($player)) {
 			Lumine::getInstance()->cache->add($player);
 		}
@@ -201,6 +224,10 @@ final class PMListener implements Listener {
 	public function send(DataPacketSendEvent $event): void {
 		$packet = $event->getPacket();
 		$player = $event->getPlayer();
+		if (!$player->isConnected()) {
+			Lumine::getInstance()->cache->remove($event->getPlayer());
+			return;
+		}
 		if (!Lumine::getInstance()->cache->exists($player)) {
 			Lumine::getInstance()->cache->add($player);
 		}

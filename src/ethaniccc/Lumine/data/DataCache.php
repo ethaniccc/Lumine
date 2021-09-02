@@ -14,6 +14,7 @@ final class DataCache {
 
 	public function add(Player $player): void {
 		$identifier = "{$player->getAddress()}:{$player->getPort()}";
+		unset($this->data[$identifier]);
 		$this->data[$identifier] = &$player;
 		Lumine::getInstance()->socketThread->send(new AddUserDataEvent([
 			"identifier" => $identifier

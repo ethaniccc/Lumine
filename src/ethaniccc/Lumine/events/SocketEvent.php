@@ -11,6 +11,7 @@ abstract class SocketEvent {
 	public const SOCKET_SEND_ERROR = "socket:send_error";
 	public const ADD_USER_DATA = "socket:add_user";
 	public const REMOVE_USER_DATA = "socket:remove_user";
+	public const BAN_USER = "socket:ban_user";
 	public const RESET_ALL_USER_DATA = "socket:reset_data";
 	public const PLAYER_SEND_PACKET = "player:send_packet";
 	public const SERVER_SEND_PACKET = "server:send_packet";
@@ -32,6 +33,8 @@ abstract class SocketEvent {
 				return new AddUserDataEvent($data);
 			case self::REMOVE_USER_DATA:
 				return new RemoveUserDataEvent($data);
+			case self::BAN_USER:
+				return new BanUserEvent($data);
 			case self::RESET_ALL_USER_DATA:
 				return new ResetDataEvent();
 			case self::PLAYER_SEND_PACKET:

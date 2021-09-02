@@ -3,6 +3,7 @@
 namespace ethaniccc\Lumine\tasks;
 
 use ethaniccc\Lumine\events\AlertNotificationEvent;
+use ethaniccc\Lumine\events\BanUserEvent;
 use ethaniccc\Lumine\events\CommandResponseEvent;
 use ethaniccc\Lumine\events\ConnectionErrorEvent;
 use ethaniccc\Lumine\events\HeartbeatEvent;
@@ -20,6 +21,11 @@ final class TickingTask extends Task {
 	public function onRun(int $currentTick) {
 		if ($currentTick % 20 === 0) {
 			Lumine::getInstance()->socketThread->send(new HeartbeatEvent());
+			foreach (Lumine::getInstance()->cache->data as $player) {
+				if (!$player->isConnected()) {
+					Lumine::getInstance()->cache->remove($player);
+				}
+			}
 		}
 		$keys = [];
 		foreach (Lumine::getInstance()->listener->locationCompensation as $id => $packet) {
@@ -74,6 +80,8 @@ final class TickingTask extends Task {
 						$player->sendMessage($event->response);
 					}
 				}
+			} elseif ($event instanceof BanUserEvent) {
+				Server::getInstance()->getNameBans()->addBan($event->username, $event->reason, $event->expiration, "Lumine AC");
 			}
 		}
 	}
