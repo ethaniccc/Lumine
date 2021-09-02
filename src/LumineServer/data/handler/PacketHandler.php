@@ -207,7 +207,7 @@ final class PacketHandler {
 				if ($data->waitingACKCount > 0) {
 					$tickDiff = $data->currentTick - $data->lastACKTick;
 					if ($tickDiff > 300 && $data->waitingACKCount >= 40) {
-						$data->disconnect(Server::getInstance()->settings->get(
+						$data->kick(Server::getInstance()->settings->get(
 							"timeout_message",
 							"NetworkStackLatency timeout (d=$tickDiff c={$data->waitingACKCount})\nPlease contact a staff member if this issue persists"
 						));

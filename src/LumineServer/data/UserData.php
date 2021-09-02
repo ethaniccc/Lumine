@@ -2,6 +2,7 @@
 
 namespace LumineServer\data;
 
+use DateTime;
 use LumineServer\data\auth\AuthData;
 use LumineServer\data\click\ClickData;
 use LumineServer\data\effect\EffectData;
@@ -24,6 +25,8 @@ use LumineServer\detections\killaura\KillauraA;
 use LumineServer\detections\range\RangeA;
 use LumineServer\detections\velocity\VelocityA;
 use LumineServer\detections\velocity\VelocityB;
+use LumineServer\events\BanUserEvent;
+use LumineServer\Server;
 use LumineServer\utils\AABB;
 use pocketmine\level\Location;
 use pocketmine\math\Vector3;
@@ -194,11 +197,20 @@ final class UserData {
 		}, $packet);
 	}
 
-	public function disconnect(string $message = "Lumine - No Reason Provided"): void {
+	public function kick(string $message = "Lumine - No Reason Provided"): void {
 		$packet = new DisconnectPacket();
 		$packet->message = $message;
 		$this->queue($packet);
 		$this->isClosed = true;
+	}
+
+	public function ban(string $reason = "Lumine - No Reason Provided", ?DateTime $expiration = null): void {
+		$this->kick($reason);
+		Server::getInstance()->socketHandler->send(new BanUserEvent([
+			"username" => $this->authData->username,
+			"reason" => $reason,
+			"expiration" => $expiration === false ? null : $expiration
+		]), $this->socketAddress);
 	}
 
 	public function destroy(): void {

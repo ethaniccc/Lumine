@@ -22,26 +22,35 @@ memory_limit: 2048M
 prefix: "§l§8[§dL§6u§em§bi§5n§de§8]"
 
 timeout_message: "NetworkStackLatency timeout\nPlease contact staff if this issue persists"
+
 # Tags: {prefix}, {codename}
-kick_message: "{prefix} You were kicked from the server for potential unfair advantage (code={codename})\nPlease contact staff if this issue persists"
+kick_message: "{prefix} You were kicked from the server for potential unfair advantage (code={codename})\nPlease contact staff if this issue persists."
 # Tags: {prefix}, {player}, {codename}, {detection}
 kick_broadcast: "{prefix} §e{player} §7was kicked for §6{detection} §7(§c{codename}§7)"
+
+# E.G - "100 years 100 months 100 days 100 hours 100 minutes 100 seconds"
+# E.G - "2 years 1 month 1 minute 1 second"
+ban_expiration: "1 minute"
+# Tags: {prefix}, {codename}, {expiration}
+ban_message: "{prefix} You were banned from the server for potential unfair advantage (code={codename})\nYour ban expires {expiration}\nPlease contact staff if this action was done in error."
+# Tags: {prefix}, {player}, {codename}, {detection}
+ban_broadcast: "{prefix} §e{player} §7was banned for §6{detection} §7(§c{codename}§7)"
 
 detections:
   InvalidMovement:
     A:
       enabled: true
-      punishment_type: kick
+      punishment_type: ban
       max_vl: 50
       codename: IMH
     B:
       enabled: true
-      punishment_type: kick
+      punishment_type: ban
       max_vl: 50
       codename: IMV
     C:
       enabled: true
-      punishment_type: kick
+      punishment_type: ban
       max_vl: 10
       codename: IJT
   Velocity:

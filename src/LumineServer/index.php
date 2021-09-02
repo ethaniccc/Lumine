@@ -12,6 +12,7 @@ namespace LumineServer {
 				require_once "src/$class.php";
 			}
 		});
+		date_default_timezone_set('America/New_York');
 		$server = new Server();
 		$server->run();
 	}

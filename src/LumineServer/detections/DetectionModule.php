@@ -58,6 +58,9 @@ abstract class DetectionModule {
 				case "kick":
 					$this->kick();
 					break;
+				case "ban":
+					$this->ban();
+					break;
 			}
 		}
 		$debugString = "";
@@ -92,7 +95,7 @@ abstract class DetectionModule {
 			Server::getInstance()->getLuminePrefix(),
 			$this->settings->get("codename", "???")
 		], Server::getInstance()->settings->get("kick_message"));
-		$this->data->disconnect($kickMessage);
+		$this->data->kick($kickMessage);
 		$kickBroadcast = str_replace([
 			"{prefix}",
 			"{player}",
@@ -104,21 +107,54 @@ abstract class DetectionModule {
 			"{$this->category} ({$this->subCategory})",
 			$this->settings->get("codename", "???")
 		], Server::getInstance()->settings->get("kick_broadcast"));
+		$this->alert($kickBroadcast);
+	}
+
+	protected function ban(): void {
+		$expiration = (new \DateTime("now"))->modify(Server::getInstance()->settings->get("ban_expiration", "7 days"));
+		$banMessage = str_replace([
+			"{prefix}",
+			"{codename}",
+			"{expiration}"
+		], [
+			Server::getInstance()->getLuminePrefix(),
+			$this->settings->get("codename", "???"),
+			($expiration === false ? "never" : $expiration->format("m/d/y H:i A T"))
+		], Server::getInstance()->settings->get("ban_message"));
+		if ($expiration === false) {
+			$expiration = null;
+		}
+		$this->data->ban($banMessage, $expiration);
+		$banBroadcast = str_replace([
+			"{prefix}",
+			"{player}",
+			"{detection}",
+			"{codename}"
+		], [
+			Server::getInstance()->getLuminePrefix(),
+			$this->data->authData->username,
+			"{$this->category} ({$this->subCategory})",
+			$this->settings->get("codename", "???")
+		], Server::getInstance()->settings->get("ban_broadcast"));
+		$this->alert($banBroadcast);
+	}
+
+	public function destroy(): void {
+		$this->data = null;
+	}
+
+	protected function alert(string $broadcast): void {
 		$batch = new BatchPacket();
 		$batch->setCompressionLevel(0);
 		$packet = new TextPacket();
 		$packet->sourceName = "";
 		$packet->type = TextPacket::TYPE_CHAT;
-		$packet->message = $kickBroadcast;
+		$packet->message = $broadcast;
 		$batch->addPacket($packet);
 		$event = new AlertNotificationEvent([
 			"alertPacket" => $batch
 		]);
 		Server::getInstance()->socketHandler->send($event, $this->data->socketAddress);
-	}
-
-	public function destroy(): void {
-		$this->data = null;
 	}
 
 }
