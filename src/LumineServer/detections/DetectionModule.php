@@ -49,7 +49,7 @@ abstract class DetectionModule {
 		}
 	}
 
-	public abstract function run(DataPacket $packet): void;
+	public abstract function run(DataPacket $packet, float $timestamp): void;
 
 	protected function flag(array $debug = [], float $vl = 1): void {
 		$this->violations += $vl;

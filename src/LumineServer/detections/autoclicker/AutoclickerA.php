@@ -12,7 +12,7 @@ final class AutoclickerA extends DetectionModule {
 		parent::__construct($data, "Autoclicker", "A", "Checks if the user's cps is over a threshold");
 	}
 
-	public function run(DataPacket $packet): void {
+	public function run(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
 		if ($data->clickData->isClicking) {
 			$cps = $data->clickData->cps;

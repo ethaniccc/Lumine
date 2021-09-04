@@ -15,7 +15,7 @@ final class VelocityA extends DetectionModule {
 		parent::__construct($data, "Velocity", "A", "Checks if the player is taking an abnormal amount of vertical velocity");
 	}
 
-	public function run(DataPacket $packet): void {
+	public function run(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
 		if ($packet instanceof PlayerAuthInputPacket) {
 			if ($data->ticksSinceMotion === 1) {

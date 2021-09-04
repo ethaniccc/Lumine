@@ -16,7 +16,7 @@ final class AuthA extends DetectionModule {
 		parent::__construct($data, "Auth", "A", "Checks if the user is faking their device OS");
 	}
 
-	public function run(DataPacket $packet): void {
+	public function run(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
 		if ($packet instanceof LoginPacket) {
 			if ($data->authData->titleID === "UNKNOWN") {

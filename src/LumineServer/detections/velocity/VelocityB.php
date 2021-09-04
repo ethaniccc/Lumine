@@ -13,7 +13,7 @@ final class VelocityB extends DetectionModule {
 		parent::__construct($data, "Velocity", "B", "Checks if the user is taking an abnormal amount of horizontal knockback");
 	}
 
-	public function run(DataPacket $packet): void {
+	public function run(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
 		if ($packet instanceof PlayerAuthInputPacket && $data->ticksSinceMotion === 1 && hypot($data->serverSentMotion->x, $data->serverSentMotion->z) > 0.01) {
 			$xPct = ($data->motion->x / $data->previousServerPredictedMotion->x) * 100;

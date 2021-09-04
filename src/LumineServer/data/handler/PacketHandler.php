@@ -245,7 +245,7 @@ final class PacketHandler {
 						}
 					}
 				}
-			} elseif ($packet instanceof UseItemOnEntityTransactionData) {
+			} elseif ($trData instanceof UseItemOnEntityTransactionData) {
 				$data->clickData->add($data->currentTick);
 			}
 		} elseif ($packet instanceof LoginPacket) {
@@ -269,7 +269,7 @@ final class PacketHandler {
 
 		foreach ($data->detections as $detection) {
 			if ($detection->enabled) {
-				$detection->run($packet);
+				$detection->run($packet, $timestamp);
 			}
 		}
 	}

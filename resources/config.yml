@@ -100,6 +100,12 @@ detections:
       punishment_type: ban
       max_vl: 1
       codename: EDA
+  Timer:
+    A:
+      enabled: true
+      punishment_type: kick
+      max_vl: 20
+      codename: TMP
   BadPackets:
     A:
       enabled: true

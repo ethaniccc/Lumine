@@ -14,7 +14,7 @@ final class InvalidMovementB extends DetectionModule {
         parent::__construct($data, "InvalidMovement", "B", "Checks if the user's Y movement is close to the predicted movement");
     }
 
-    public function run(DataPacket $packet): void {
+    public function run(DataPacket $packet, float $timestamp): void {
         $data = $this->data;
         if ($packet instanceof PlayerAuthInputPacket) {
             $diff = abs($data->motion->y - $data->previousServerPredictedMotion->y);

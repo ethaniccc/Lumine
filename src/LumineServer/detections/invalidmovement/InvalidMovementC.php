@@ -16,7 +16,7 @@ class InvalidMovementC extends DetectionModule {
         parent::__construct($data, "InvalidMovement", "C", "Checks if the delay between the user's jumps are invalid");
     }
 
-	public function run(DataPacket $packet): void {
+	public function run(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
 		if ($packet instanceof PlayerAuthInputPacket) {
 			$this->jumpTicks--;

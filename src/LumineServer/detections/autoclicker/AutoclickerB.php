@@ -14,7 +14,7 @@ class AutoclickerB extends DetectionModule {
 		parent::__construct($data, "Autoclicker", "B", "Checks if the user is clicking above 16 cps with no double clicks");
 	}
 
-	public function run(DataPacket $packet): void {
+	public function run(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
 		if ($data->clickData->isClicking) {
 			$this->samples[] = $data->clickData->delay;

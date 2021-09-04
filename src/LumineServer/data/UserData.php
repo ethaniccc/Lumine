@@ -23,6 +23,7 @@ use LumineServer\detections\invalidmovement\InvalidMovementB;
 use LumineServer\detections\invalidmovement\InvalidMovementC;
 use LumineServer\detections\killaura\KillauraA;
 use LumineServer\detections\range\RangeA;
+use LumineServer\detections\timer\TimerA;
 use LumineServer\detections\velocity\VelocityA;
 use LumineServer\detections\velocity\VelocityB;
 use LumineServer\events\BanUserEvent;
@@ -157,6 +158,8 @@ final class UserData {
 			new AutoclickerB($this),
 
 			new AuthA($this),
+
+			new TimerA($this),
 
 			new BadPacketsA($this),
 		];

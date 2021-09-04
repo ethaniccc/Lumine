@@ -15,7 +15,7 @@ final class BadPacketsA extends DetectionModule {
         parent::__construct($data, "BadPackets", "A", "Checks if the player is sending the wrong movement packet");
     }
 
-    public function run(DataPacket $packet): void {
+    public function run(DataPacket $packet, float $timestamp): void {
         $data = $this->data;
         if ($packet instanceof MovePlayerPacket) {
             $diff = $data->currentTick - $this->lastTick;

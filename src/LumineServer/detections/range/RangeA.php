@@ -15,7 +15,7 @@ final class RangeA extends DetectionModule {
 		parent::__construct($data, "Range", "A", "Checks if the player has an abnormal amount of range");
 	}
 
-	public function run(DataPacket $packet): void {
+	public function run(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
 		if ($packet instanceof InventoryTransactionPacket) {
 			$trData = $packet->trData;

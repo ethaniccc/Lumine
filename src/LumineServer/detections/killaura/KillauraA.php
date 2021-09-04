@@ -17,7 +17,7 @@ final class KillauraA extends DetectionModule {
         parent::__construct($data, "Killaura", "A", "Checks if the player is swinging their arm while attacking an entity");
     }
 
-    public function run(DataPacket $packet): void {
+    public function run(DataPacket $packet, float $timestamp): void {
         $data = $this->data;
         if ($packet instanceof AnimatePacket && $packet->action === AnimatePacket::ACTION_SWING_ARM) {
             $tickDiff = $data->currentTick - $this->lastSwingTick;
