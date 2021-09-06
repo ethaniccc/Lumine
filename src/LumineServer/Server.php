@@ -68,6 +68,10 @@ final class Server {
 						$this->logger->log("TPS=" . round($this->currentTPS, 2));
 						$this->logger->log("Memory usage=" . round(memory_get_usage() / 1e+6, 4) . "MB");
 						break;
+					case "reloadconfig":
+						unset($this->settings);
+						$this->settings = new Settings(yaml_parse(file_get_contents("./resources/config.yml")));
+						break;
 					case "logperf":
 						$sub = $args[0] ?? null;
 						switch ($sub) {

@@ -21,6 +21,10 @@ memory_limit: 2048M
 
 prefix: "§l§8[§dL§6u§em§bi§5n§de§8]"
 
+# Tags: {prefix}, {name}, {detection}, {violations}, {debug}
+alert_message: "{prefix} §d{name} §eflagged §b{detection} §7(§cx{violations}§7) §7[{debug}]"
+
+# Whenever a player is unable to respond with a certain packet, they are kicked with this message.
 timeout_message: "NetworkStackLatency timeout\nPlease contact staff if this issue persists"
 
 # Tags: {prefix}, {codename}

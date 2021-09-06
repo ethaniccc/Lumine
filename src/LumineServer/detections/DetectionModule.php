@@ -77,6 +77,20 @@ abstract class DetectionModule {
 				$i++;
 			}
 		}
+		$violationMessage = str_replace([
+			"{prefix}",
+			"{name}",
+			"{detection}",
+			"{violations}",
+			"{debug}"
+		], [
+			Server::getInstance()->getLuminePrefix(),
+			$this->data->authData->username,
+			"{$this->category} ({$this->subCategory})",
+			var_export(round($this->violations, 2), true),
+			$debugString
+		], Server::getInstance()->settings->get("alert_message", "{prefix} §e{name} §7failed §e{detection} §7(§cx{violations}§7) §7{debug}"));
+		$this->alert($violationMessage, "violation");
 		Server::getInstance()->logger->log("[{$this->data->authData->username} ({$this->data->currentTick}) @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]");
 	}
 
@@ -107,7 +121,7 @@ abstract class DetectionModule {
 			"{$this->category} ({$this->subCategory})",
 			$this->settings->get("codename", "???")
 		], Server::getInstance()->settings->get("kick_broadcast"));
-		$this->alert($kickBroadcast);
+		$this->alert($kickBroadcast, "punishment");
 	}
 
 	protected function ban(): void {
@@ -136,14 +150,14 @@ abstract class DetectionModule {
 			"{$this->category} ({$this->subCategory})",
 			$this->settings->get("codename", "???")
 		], Server::getInstance()->settings->get("ban_broadcast"));
-		$this->alert($banBroadcast);
+		$this->alert($banBroadcast, "punishment");
 	}
 
 	public function destroy(): void {
 		$this->data = null;
 	}
 
-	protected function alert(string $broadcast): void {
+	protected function alert(string $broadcast, string $type): void {
 		$batch = new BatchPacket();
 		$batch->setCompressionLevel(0);
 		$packet = new TextPacket();
@@ -152,6 +166,7 @@ abstract class DetectionModule {
 		$packet->message = $broadcast;
 		$batch->addPacket($packet);
 		$event = new AlertNotificationEvent([
+			"alertType" => $type,
 			"alertPacket" => $batch
 		]);
 		Server::getInstance()->socketHandler->send($event, $this->data->socketAddress);

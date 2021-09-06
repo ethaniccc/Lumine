@@ -221,6 +221,9 @@ final class SocketHandler {
 											]), $client->address);
 										} else {
 											$message = "";
+											if ($event->sender === "CONSOLE") {
+												$message .= PHP_EOL;
+											}
 											$times = 1;
 											foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
 												foreach ($queue as $otherData) {
@@ -230,8 +233,8 @@ final class SocketHandler {
 														foreach ($otherData->detections as $detection) {
 															if ($detection->violations >= 2) {
 																$message .= TextFormat::AQUA . "(" . TextFormat::LIGHT_PURPLE . var_export(round($detection->violations, 2), true) . TextFormat::AQUA . ") ";
-																$message .= TextFormat::GRAY . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GRAY . ") ";
-																$message .= TextFormat::DARK_GRAY . "- " . TextFormat::GOLD . $detection->description . PHP_EOL;
+																$message .= TextFormat::GOLD . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GOLD . ") ";
+																$message .= TextFormat::DARK_GRAY . "- " . TextFormat::WHITE . $detection->description . PHP_EOL;
 																$logs++;
 															}
 														}
