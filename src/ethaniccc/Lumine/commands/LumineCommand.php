@@ -34,6 +34,15 @@ final class LumineCommand extends Command implements PluginIdentifiableCommand {
 						]), $sender);
 					}
 					break;
+				case "cooldown":
+					if (!$sender->hasPermission("ac.command.cooldown") || !$sender instanceof Player) {
+						$this->deny($sender);
+					} else {
+						$cooldown = (int) ($args[0] ?? 3);
+						Lumine::getInstance()->alertCooldowns[$sender->getName()] = $cooldown;
+						$sender->sendMessage(TextFormat::GREEN . "Your alert cooldown has been set to $cooldown seconds");
+					}
+					break;
 			}
 		}
 	}

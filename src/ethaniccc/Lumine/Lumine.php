@@ -8,7 +8,6 @@ use ethaniccc\Lumine\commands\LumineCommand;
 use ethaniccc\Lumine\data\DataCache;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use ethaniccc\Lumine\events\InitDataEvent;
-use ethaniccc\Lumine\events\ResetDataEvent;
 use ethaniccc\Lumine\tasks\TickingTask;
 use ethaniccc\Lumine\thread\LumineSocketThread;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
@@ -24,6 +23,11 @@ class Lumine extends PluginBase {
 	public PMListener $listener;
 	public TickingTask $task;
 	public DataCache $cache;
+
+	/** @var int[] */
+	public array $alertCooldowns = [];
+	/** @var float[] */
+	public array $lastAlertTimes = [];
 
 	public static function getInstance(): ?self {
 		return self::$instance;
@@ -42,7 +46,6 @@ class Lumine extends PluginBase {
 		$this->settings = new Settings($this->getConfig()->getAll());
 		$this->socketThread = new LumineSocketThread($this->settings, $this->getServer()->getLogger());
 		$this->socketThread->start(PTHREADS_INHERIT_NONE);
-		$this->socketThread->send(new ResetDataEvent()); // reset all data when the server is started up
 		$this->socketThread->send(new InitDataEvent([
 			"extraData" => [
 				"bedrockKnownStates" => serialize(RuntimeBlockMapping::getBedrockKnownStates()),

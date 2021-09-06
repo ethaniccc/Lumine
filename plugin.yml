@@ -15,7 +15,10 @@ permissions:
           ac.command.logs:
             description: The permission that grants log command access in Lumine
             default: op
+          ac.command.cooldown:
+            description: The permission that grants alert cooldown command access in Lumine
+            default: op
       ac.notifications:
-        description: The permission that grants Lumine notifcations alerting when a player is punished.
+        description: The permission that grants the ability to view Lumine notifcations
         default: op
 ...

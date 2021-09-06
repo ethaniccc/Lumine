@@ -54,6 +54,9 @@ final class PMListener implements Listener {
 		}
 		if ($event->isCancelled()) {
 			Lumine::getInstance()->cache->remove($event->getPlayer());
+		} else {
+			Lumine::getInstance()->alertCooldowns[$event->getPlayer()->getName()] = 3;
+			Lumine::getInstance()->lastAlertTimes[$event->getPlayer()->getName()] = 0;
 		}
 	}
 
@@ -290,6 +293,8 @@ final class PMListener implements Listener {
 
 	public function quit(PlayerQuitEvent $event): void {
 		Lumine::getInstance()->cache->remove($event->getPlayer());
+		unset(Lumine::getInstance()->alertCooldowns[$event->getPlayer()->getName()]);
+		unset(Lumine::getInstance()->lastAlertTimes[$event->getPlayer()->getName()]);
 	}
 
 	private function getAllInBatch(BatchPacket $packet): array {
