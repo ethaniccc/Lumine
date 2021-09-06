@@ -2,13 +2,8 @@
 
 namespace LumineServer\data;
 
-use LumineServer\Server;
-
 final class DataStorage {
 
-	/** @var array
-	 *  string => UserData[]
-	 */
 	private array $storage = [];
 
 	public function add(string $identifier, string $socket): UserData {
