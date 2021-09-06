@@ -22,7 +22,7 @@ class LoggerThread extends \Thread {
 	public function run(): void {
 		$stream = fopen($this->log, 'ab');
 		if (!is_resource($stream)) {
-			throw new AssumptionFailedError("Open File $this->log failed");
+			throw new AssumptionFailedError("Failed to open a stream for {$this->log}");
 		}
 		while ($this->running) {
 			$this->writeStream($stream);

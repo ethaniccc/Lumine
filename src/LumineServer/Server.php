@@ -8,6 +8,7 @@ use LumineServer\detections\DetectionModule;
 use LumineServer\socket\SocketHandler;
 use LumineServer\threads\CommandThread;
 use LumineServer\threads\LoggerThread;
+use LumineServer\threads\WebhookThread;
 use LumineServer\utils\MCMathHelper;
 use pocketmine\block\BlockFactory;
 use pocketmine\item\ItemFactory;
@@ -24,6 +25,7 @@ final class Server {
 	public SleeperHandler $tickSleeper;
 	public CommandThread $console;
 	public LoggerThread $logger;
+	public WebhookThread $webhookThread;
 	public DataStorage $dataStorage;
 	public Settings $settings;
 	public bool $running = true;
@@ -42,6 +44,7 @@ final class Server {
 		@mkdir("logs");
 		@mkdir("resources");
 		$this->logger = new LoggerThread("logs/server.log");
+		$this->webhookThread = new WebhookThread();
 		$this->dataStorage = new DataStorage();
 		$this->tickSleeper = new SleeperHandler();
 		$this->settings = new Settings(yaml_parse(file_get_contents("./resources/config.yml")));
@@ -99,6 +102,9 @@ final class Server {
 		$this->console->start(PTHREADS_INHERIT_NONE);
 		$this->logger->log("Command input thread started");
 
+		$this->webhookThread->start(PTHREADS_INHERIT_NONE);
+		$this->logger->log("Webhook thread was started");
+
 		$this->socketHandler->start();
 		$this->logger->log("Socket handler started");
 
@@ -135,6 +141,7 @@ final class Server {
 		$this->socketHandler->shutdown();
 		$this->logger->quit();
 		$this->console->quit();
+		$this->webhookThread->quit();
 		exit("Terminated.");
 	}
 

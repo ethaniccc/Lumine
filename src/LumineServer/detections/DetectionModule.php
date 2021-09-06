@@ -179,39 +179,29 @@ abstract class DetectionModule {
 	protected function sendDiscordAlert(string $player, string $debug): void {
 		$webhookSettings = Server::getInstance()->settings->get("webhook");
 		$webhookLink = $webhookSettings->get("link");
-		// $canSend = $webhookSettings->get("alert") && $webhookLink !== "none";
-		
-		if($webhookLink === null || $webhookLink === "none" || $webhookSettings->get("alerts") === false) {
+
+		if ($webhookLink === null || $webhookLink === "none" || $webhookSettings->get("alerts") === false) {
 			return;
 		}
 
 		$msg = new Message();
 		$msg->setContent("");
-
-		
 		$embed = new Embed();
-		$embed->setTitle("Lumine Anti-Cheat");
+		$embed->setTitle("Lumine");
 		$embed->setColor(0xFFC300);
 		$embed->setFooter((new \DateTime('now'))->format("m/d/y @ h:m:s A"));
 		$embed->setDescription("
 		Player: **`$player`**
 		Violations: **`{$this->violations}`**
 		Codename: **`{$this->settings->get("codename")}`**
-		Detection name: **`{$this->category} ({$this->subCategory})`**
+		Detection: **`{$this->category} ({$this->subCategory})`**
 		Debug data: **`$debug`**
 		");
 
 		$msg->addEmbed($embed);
 
 		$webhook = new Webhook($webhookLink, $msg);
-		$ch = curl_init($webhook->getURL());
-		curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($webhook->getMessage()));
-		curl_setopt($ch, CURLOPT_POST, true);
-		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
-		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
-		curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
-		curl_close($ch);
+		Server::getInstance()->webhookThread->queue($webhook);
 	}
 
 }
