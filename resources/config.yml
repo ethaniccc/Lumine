@@ -40,6 +40,14 @@ ban_message: "{prefix} You were banned from the server for potential unfair adva
 # Tags: {prefix}, {player}, {codename}, {detection}
 ban_broadcast: "{prefix} §e{player} §7was banned for §6{detection} §7(§c{codename}§7)"
 
+webhook:
+  # Link to the webhook (leave as none to keep webhook functionality disabled)
+  link: none
+  # If alerts should be sent in webhook messages
+  alerts: true
+  # If punishments should be sent in webhook messages
+  punishments: true
+
 detections:
   InvalidMovement:
     A:

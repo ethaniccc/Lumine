@@ -6,6 +6,9 @@ use LumineServer\data\UserData;
 use LumineServer\events\AlertNotificationEvent;
 use LumineServer\Server;
 use LumineServer\Settings;
+use LumineServer\webhook\Message;
+use LumineServer\webhook\Embed;
+use LumineServer\webhook\Webhook;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\TextPacket;
@@ -91,6 +94,7 @@ abstract class DetectionModule {
 			$debugString
 		], Server::getInstance()->settings->get("alert_message", "{prefix} §e{name} §7failed §e{detection} §7(§cx{violations}§7) §7{debug}"));
 		$this->alert($violationMessage, "violation");
+		$this->sendDiscordAlert($this->data->authData->username, $debugString);
 		Server::getInstance()->logger->log("[{$this->data->authData->username} ({$this->data->currentTick}) @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]");
 	}
 
@@ -170,6 +174,44 @@ abstract class DetectionModule {
 			"alertPacket" => $batch
 		]);
 		Server::getInstance()->socketHandler->send($event, $this->data->socketAddress);
+	}
+
+	protected function sendDiscordAlert(string $player, string $debug): void {
+		$webhookSettings = Server::getInstance()->settings->get("webhook");
+		$webhookLink = $webhookSettings->get("link");
+		// $canSend = $webhookSettings->get("alert") && $webhookLink !== "none";
+		
+		if($webhookLink === null || $webhookLink === "none" || $webhookSettings->get("alerts") === false) {
+			return;
+		}
+
+		$msg = new Message();
+		$msg->setContent("");
+
+		
+		$embed = new Embed();
+		$embed->setTitle("Lumine Anti-Cheat");
+		$embed->setColor(0xFFC300);
+		$embed->setFooter((new \DateTime('now'))->format("m/d/y @ h:m:s A"));
+		$embed->setDescription("
+		Player: **`$player`**
+		Violations: **`{$this->violations}`**
+		Codename: **`{$this->settings->get("codename")}`**
+		Detection name: **`{$this->category} ({$this->subCategory})`**
+		Debug data: **`$debug`**
+		");
+
+		$msg->addEmbed($embed);
+
+		$webhook = new Webhook($webhookLink, $msg);
+		$ch = curl_init($webhook->getURL());
+		curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($webhook->getMessage()));
+		curl_setopt($ch, CURLOPT_POST, true);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+		curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+		curl_setopt($ch, CURLOPT_HTTPHEADER, ["Content-Type: application/json"]);
+		curl_close($ch);
 	}
 
 }
