@@ -20,7 +20,7 @@ final class VelocityB extends DetectionModule {
 			$zPct = ($data->motion->z / $data->previousServerPredictedMotion->z) * 100;
 			$min = $this->settings->get("min_pct", 99.99);
 			$max = $this->settings->get("max_pct", 150);
-			if ($xPct < $min || $zPct < $min || $xPct > $max || $zPct > $max) {
+			if (($xPct < $min && $zPct < $min) || ($xPct > $max && $zPct > $max)) {
 				$this->flag([
 					"xPct" => round($xPct, 5),
 					"zPct" => round($zPct, 5)
