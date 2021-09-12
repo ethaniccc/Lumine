@@ -6,9 +6,7 @@ namespace LumineServer {
 		require_once "./vendor/autoload.php";
 		spl_autoload_register (function ($class) {
 			$class = str_replace ("\\", DIRECTORY_SEPARATOR, $class);
-			if (!is_file ("src/$class.php")) {
-				throw new \LogicException ("Class $class not found");
-			} else {
+			if (is_file ("src/$class.php")) {
 				require_once "src/$class.php";
 			}
 		});
