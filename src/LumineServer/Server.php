@@ -4,6 +4,7 @@ namespace LumineServer;
 
 use LumineServer\blocks\WoodenFenceOverride;
 use LumineServer\data\DataStorage;
+use LumineServer\data\UserData;
 use LumineServer\detections\DetectionModule;
 use LumineServer\socket\SocketHandler;
 use LumineServer\threads\CommandThread;
@@ -74,6 +75,16 @@ final class Server {
 					case "reloadconfig":
 						unset($this->settings);
 						$this->settings = new Settings(yaml_parse(file_get_contents("./resources/config.yml")));
+						DetectionModule::init();
+						foreach ($this->dataStorage->getAll() as $queue) {
+							foreach ($queue as $data) {
+								/** @var UserData $data */
+								foreach ($data->detections as $detection) {
+									$detection->reloadSettings();
+								}
+							}
+						}
+						$this->logger->log("Config settings were reloaded");
 						break;
 					case "logperf":
 						$sub = $args[0] ?? null;

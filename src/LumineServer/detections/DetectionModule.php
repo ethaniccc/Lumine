@@ -39,19 +39,24 @@ abstract class DetectionModule {
 		$this->subCategory = $subCategory;
 		$this->description = $description;
 		$this->experimental = $experimental;
-		$categorySettings = self::$globalSettings->get($category);
+		$this->reloadSettings();
+	}
+
+	public abstract function run(DataPacket $packet, float $timestamp): void;
+
+	public function reloadSettings(): void {
+		$categorySettings = self::$globalSettings->get($this->category);
 		if (!$categorySettings instanceof Settings) {
 			$this->enabled = true;
 			$this->settings = new Settings([]);
-			Server::getInstance()->logger->log("Settings were not found for the $category detections", false);
+			Server::getInstance()->logger->log("Settings were not found for the {$this->category} detections", false);
 		} else {
-			$this->settings = $categorySettings->get($subCategory, new Settings([
+			unset($this->settings);
+			$this->settings = $categorySettings->get($this->subCategory, new Settings([
 			]));
 			$this->enabled = $this->settings->get("enabled", true);
 		}
 	}
-
-	public abstract function run(DataPacket $packet, float $timestamp): void;
 
 	protected function flag(array $debug = [], float $vl = 1): void {
 		$this->violations += $vl;
