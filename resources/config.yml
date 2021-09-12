@@ -106,6 +106,13 @@ detections:
       punishment_type: kick
       max_vl: 10
       codename: NDC
+  AimAssist:
+    A:
+      enabled: true
+      correlation: 99.0
+      punishment_type: kick
+      max_vl: 5
+      codename: CAM
   Auth:
     A:
       enabled: true

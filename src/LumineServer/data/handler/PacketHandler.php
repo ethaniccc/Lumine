@@ -247,17 +247,16 @@ final class PacketHandler {
 				}
 			} elseif ($trData instanceof UseItemOnEntityTransactionData) {
 				$data->clickData->add($data->currentTick);
+				$data->attackPos = $trData->getPlayerPos();
 			}
 		} elseif ($packet instanceof LoginPacket) {
-			try {
-				$d = $packet->chainData;
-				$parts = explode(".", $d['chain'][2]);
-				$jwt = json_decode(base64_decode($parts[1], true), true);
-				$auth = $jwt['extraData'];
+			$d = $packet->chainData;
+			$parts = @explode(".", $d['chain'][2]);
+			$jwt = @json_decode(base64_decode($parts[1], true), true);
+			$auth = $jwt['extraData'] ?? null;
+			$auth === null ?
+				$data->authData = new AuthData("UNKNOWN", "UNKNOWN", TextFormat::clean($packet->clientData["ThirdPartyName"]), "UNKNOWN") :
 				$data->authData = new AuthData($auth["XUID"], $auth["identity"], TextFormat::clean($auth["displayName"]), $auth["titleId"]);
-			} catch (\Exception $e) {
-				$data->authData = new AuthData("UNKNOWN", "UNKNOWN", TextFormat::clean($packet->clientData["ThirdPartyName"]), "UNKNOWN");
-			}
 			$data->playerOS = $packet->clientData["DeviceOS"];
 		} elseif ($packet instanceof AdventureSettingsPacket) {
 			$data->isFlying = $packet->getFlag(AdventureSettingsPacket::FLYING);
@@ -353,9 +352,9 @@ final class PacketHandler {
 					if ($realBlock->getId() !== $blockId) {
 						$data->ghostBlockHandler->suspect(BlockFactory::get($blockId, 0, Position::fromObject($position)));
 					}
-				} elseif ($packet instanceof StartGamePacket) {
-					$data->entityRuntimeId = $packet->entityRuntimeId;
-					$data->isSurvival = ($packet->playerGamemode === GameMode::SURVIVAL || $packet->playerGamemode === GameMode::ADVENTURE);
+				} elseif ($pk instanceof StartGamePacket) {
+					$data->entityRuntimeId = $pk->entityRuntimeId;
+					$data->isSurvival = ($pk->playerGamemode === GameMode::SURVIVAL || $pk->playerGamemode !== GameMode::CREATIVE);
 				}
 			}
 		}
@@ -448,7 +447,7 @@ final class PacketHandler {
 			});
 		} elseif ($packet instanceof SetPlayerGameTypePacket) {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
-				$data->isSurvival = ($packet->gamemode === GameMode::SURVIVAL || $packet->gamemode === GameMode::ADVENTURE);
+				$data->isSurvival = ($packet->gamemode === GameMode::SURVIVAL || $packet->gamemode !== GameMode::CREATIVE);
 			});
 		} elseif ($packet instanceof AdventureSettingsPacket) {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {

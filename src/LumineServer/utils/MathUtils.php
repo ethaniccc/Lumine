@@ -1,5 +1,7 @@
 <?php
 
+namespace LumineServer\utils;
+
 /**
  * @author Github Copilot - An absoulte madlad.
  */
@@ -40,6 +42,106 @@ final class MathUtils {
             $sum += pow($number - $mean, 3);
         }
 		return $sum / ($variance * $stdDev * $stdDev);
+    }
+
+    public static function getStandardDeviation(array $numbers): float {
+        $mean = self::getMean($numbers);
+        $variance = self::getVariance($numbers, $mean);
+        return sqrt($variance);
+    }
+
+    public static function getMedian(array $numbers): float {
+        sort($numbers);
+        $count = count($numbers);
+        if ($count % 2 == 0) {
+            return ($numbers[$count / 2 - 1] + $numbers[$count / 2]) / 2;
+        } else {
+            return $numbers[$count / 2];
+        }
+    }
+
+    public static function getMode(array $numbers): float {
+        $counts = array_count_values($numbers);
+        $max = max($counts);
+        $modes = array();
+        foreach ($counts as $number => $count) {
+            if ($count == $max) {
+                $modes[] = $number;
+            }
+        }
+        sort($modes);
+        return $modes[0];
+    }
+
+    public static function getRange(array $numbers): float {
+        sort($numbers);
+        return $numbers[count($numbers) - 1] - $numbers[0];
+    }
+
+    public static function getPercentile(array $numbers, float $percentile): float {
+        sort($numbers);
+        $index = (count($numbers) - 1) * $percentile;
+        $lower = floor($index);
+        $upper = ceil($index);
+        if ($upper == $lower) {
+            return $numbers[$lower];
+        } else {
+            return $numbers[$lower] + ($index - $lower) * ($numbers[$upper] - $numbers[$lower]);
+        }
+    }
+
+    public static function getCovariance(array $x, array $y): float {
+        $xMean = self::getMean($x);
+        $yMean = self::getMean($y);
+        $sum = 0;
+        for ($i = 0; $i < count($x); $i++) {
+            $sum += ($x[$i] - $xMean) * ($y[$i] - $yMean);
+        }
+        return $sum / count($x);
+    }
+
+    public static function getCorrelation(array $x, array $y): float {
+        $xMean = self::getMean($x);
+        $yMean = self::getMean($y);
+        $xStdDev = self::getStandardDeviation($x);
+        $yStdDev = self::getStandardDeviation($y);
+        $covariance = self::getCovariance($x, $y);
+        return $covariance / ($xStdDev * $yStdDev);
+    }
+
+    public static function getStandardError(array $numbers): float {
+        return self::getStandardDeviation($numbers) / sqrt(count($numbers));
+    }
+
+    public static function getConfidenceInterval(array $numbers, float $confidence): float {
+        $standardError = self::getStandardError($numbers);
+        return $standardError * self::getPercentile($numbers, $confidence);
+    }
+
+    public static function getOutliers(array $numbers, float $confidence): array {
+        $lower = self::getPercentile($numbers, $confidence / 2);
+        $upper = self::getPercentile($numbers, 1 - $confidence / 2);
+        $outliers = array();
+        foreach ($numbers as $number) {
+            if ($number < $lower || $number > $upper) {
+                $outliers[] = $number;
+            }
+        }
+        return $outliers;
+    }
+
+    public static function getAverage(array $numbers): float {
+        return array_sum($numbers) / count($numbers);
+    }
+
+    public static function getCorrelationCoefficient(array $x, array $y): float {
+        $xStdDev = self::getStandardDeviation($x);
+        $yStdDev = self::getStandardDeviation($y);
+        $covariance = self::getCovariance($x, $y);
+		if ($xStdDev * $yStdDev == 0) {
+			return 0;
+		}
+        return $covariance / ($xStdDev * $yStdDev);
     }
 
 }

@@ -15,7 +15,7 @@ final class ClickData {
 
 	public function add(int $currentTick): void {
 		$this->isClicking = true;
-		$this->delay = (count($this->clicks) > 0 ? $currentTick - max($this->clicks) : 0);
+		$this->delay = ((count($this->clicks) > 0 ? $currentTick - max($this->clicks) : 0)) * 50;
 		$this->clicks[] = $currentTick;
 		$this->clicks = array_filter($this->clicks, function (int $clickTick) use ($currentTick): bool {
 			return $currentTick - $clickTick <= 20;

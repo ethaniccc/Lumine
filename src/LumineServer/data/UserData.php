@@ -13,6 +13,7 @@ use LumineServer\data\handler\PacketHandler;
 use LumineServer\data\location\LocationMap;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\world\VirtualWorld;
+use LumineServer\detections\aimassist\AimAssistA;
 use LumineServer\detections\auth\AuthA;
 use LumineServer\detections\autoclicker\AutoclickerA;
 use LumineServer\detections\autoclicker\AutoclickerB;
@@ -56,6 +57,7 @@ final class UserData {
 	public Vector3 $previousServerPredictedMotion;
 	public Vector3 $serverSentMotion;
 	public Vector3 $lastOnGroundLocation;
+	public ?Vector3 $attackPos = null;
 
 	public int $ticksSinceMotion = 0;
 	public int $ticksOnGround = 0;
@@ -156,6 +158,8 @@ final class UserData {
 
 			new AutoclickerA($this),
 			new AutoclickerB($this),
+
+			new AimAssistA($this),
 
 			new AuthA($this),
 

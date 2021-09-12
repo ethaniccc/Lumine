@@ -35,7 +35,6 @@ abstract class DetectionModule {
 
 	public function __construct(UserData $data, $category, string $subCategory, string $description, bool $experimental = false) {
 		$this->data = $data;
-
 		$this->category = $category;
 		$this->subCategory = $subCategory;
 		$this->description = $description;
@@ -159,6 +158,7 @@ abstract class DetectionModule {
 
 	public function destroy(): void {
 		$this->data = null;
+		unset($this->settings);
 	}
 
 	protected function alert(string $broadcast, string $type): void {
