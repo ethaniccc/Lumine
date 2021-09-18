@@ -20,7 +20,7 @@ final class NetworkChunkDeserializer {
 			if ($subData === false) {
 				throw new UnexpectedValueException("Error while processing network chunk - unexpected data given (" . base64_encode($subInformation) . " current=" . count($subChunks) . " needed=$subChunkCount)");
 			}
-			$subChunks[] = new SubChunk($subIDS, $subData);
+			$subChunks[] = new SubChunkOverride($subIDS, $subData);
 			$total .= "\x00" . $subInformation;
 			// strlen(chr(0)) + strlen(IDS) + strlen(DATA)
 			$nextPos += 1 + 2048 + 4096;
