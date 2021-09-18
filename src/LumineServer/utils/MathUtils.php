@@ -14,7 +14,11 @@ final class MathUtils {
         foreach ($numbers as $number) {
             $sum += pow($number - $mean, 4);
         }
-		return $sum / ($variance * $variance * $variance);
+		$var = ($variance * $variance * $variance);
+		if ($var == 0) {
+			return 0;
+		}
+		return $sum / $var;
     }
 
     public static function getMean(array $numbers): float {
@@ -41,7 +45,11 @@ final class MathUtils {
         foreach ($numbers as $number) {
             $sum += pow($number - $mean, 3);
         }
-		return $sum / ($variance * $stdDev * $stdDev);
+		$var = ($variance * $stdDev * $stdDev);
+		if ($var == 0) {
+			return 0;
+		}
+		return $sum / $var;
     }
 
     public static function getStandardDeviation(array $numbers): float {
