@@ -3,8 +3,8 @@
 namespace ethaniccc\Lumine\data\protocol\v428;
 
 use ethaniccc\Lumine\data\protocol\LegacyItemSlot;
-use pocketmine\item\Item;
 use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\protocol\types\inventory\ItemStack;
 use pocketmine\network\mcpe\protocol\types\inventory\NetworkInventoryAction;
 
 class UseItemInteractionData {
@@ -19,7 +19,7 @@ class UseItemInteractionData {
 	public Vector3 $blockPos;
 	public int $blockFace;
 	public int $hotbarSlot;
-	public Item $heldItem;
+	public ItemStack $heldItem;
 	public Vector3 $playerPos;
 	public Vector3 $clickPos;
 	public int $blockRuntimeId;

@@ -5,7 +5,6 @@ namespace ethaniccc\Lumine\data\protocol\v428;
 use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\LegacyItemSlot;
 use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStackWrapper;
 use pocketmine\network\mcpe\protocol\types\inventory\NetworkInventoryAction;
 use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\ItemStackRequest;
@@ -43,7 +42,7 @@ class PlayerAuthInputPacket extends \pocketmine\network\mcpe\protocol\PlayerAuth
 			$this->itemInteractionData->blockPos = new Vector3($x, $y, $z);
 			$this->itemInteractionData->blockFace = $in->getVarInt();
 			$this->itemInteractionData->hotbarSlot = $in->getVarInt();
-			$this->itemInteractionData->heldItem = TypeConverter::getInstance()->netItemStackToCore(ItemStackWrapper::read($in)->getItemStack());
+			$this->itemInteractionData->heldItem = ItemStackWrapper::read($in)->getItemStack();
 			$this->itemInteractionData->playerPos = $in->getVector3();
 			$this->itemInteractionData->clickPos = $in->getVector3();
 			$this->itemInteractionData->blockRuntimeId = $in->getUnsignedVarInt();
