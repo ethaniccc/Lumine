@@ -10,6 +10,8 @@ use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use ethaniccc\Lumine\events\InitDataEvent;
 use ethaniccc\Lumine\tasks\TickingTask;
 use ethaniccc\Lumine\thread\LumineSocketThread;
+use pocketmine\network\mcpe\convert\ItemTranslator;
+use pocketmine\network\mcpe\convert\ItemTypeDictionary;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\plugin\PluginBase;
@@ -51,6 +53,8 @@ class Lumine extends PluginBase {
 				"bedrockKnownStates" => serialize(RuntimeBlockMapping::getBedrockKnownStates()),
 				"runtimeToLegacyMap" => serialize($reflection->getStaticPropertyValue("runtimeToLegacyMap")),
 				"legacyToRuntimeMap" => serialize($reflection->getStaticPropertyValue("legacyToRuntimeMap")),
+				"itemTranslator" => serialize(ItemTranslator::getInstance()),
+				"itemDictionary" => serialize(ItemTypeDictionary::getInstance()),
 			]
 		])); // init some data the server is going to need
 		$this->listener = new PMListener();
