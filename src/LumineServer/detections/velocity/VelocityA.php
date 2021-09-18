@@ -21,7 +21,7 @@ final class VelocityA extends DetectionModule {
 			if ($data->ticksSinceMotion === 1) {
 				$this->shouldRun = true;
 			}
-			if ($data->previousServerPredictedMotion->y < 0.005 || $data->ticksSinceInClimbable < 10 || $data->ticksSinceInCobweb < 10 || $data->ticksSinceInLiquid < 10) {
+			if ($data->previousServerPredictedMotion->y < 0.005 || $data->ticksSinceInClimbable < 10 || $data->ticksSinceInCobweb < 10 || $data->ticksSinceInLiquid < 10 || $data->isTeleporting) {
 				$this->shouldRun = false;
 			}
 			if ($this->shouldRun) {

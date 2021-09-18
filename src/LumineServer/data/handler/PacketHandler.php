@@ -229,7 +229,7 @@ final class PacketHandler {
 					$clickedBlockPos = $trData->getBlockPos();
 					$newBlockPos = $clickedBlockPos->getSide($trData->getFace());
 					$blockToReplace = $data->world->getBlock($newBlockPos);
-					$block = $trData->getItemInHand()->getBlock();
+					$block = $trData->getItemInHand()->getItemStack()->getBlock();
 					if ($trData->getItemInHand()->getItemStack()->getId() < 0) {
 						$block = new UnknownBlock($trData->getItemInHand()->getItemStack()->getId(), 0);
 						$block->position($blockToReplace->asPosition());

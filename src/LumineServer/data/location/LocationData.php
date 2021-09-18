@@ -9,6 +9,7 @@ final class LocationData {
 	public Vector3 $currentPos;
 	public Vector3 $lastPos;
 	public int $newPosRotationIncrements = 0;
+	public int $teleportTicks = 0;
 	public float $hitboxWidth = 0.3;
 	public float $hitboxHeight = 1.8;
 
@@ -22,11 +23,15 @@ final class LocationData {
 	}
 
 	public function set(Vector3 $newPos, bool $teleport = false): void {
-		$this->newPosRotationIncrements = $teleport ? 1 : 3;
+		$this->newPosRotationIncrements = 3;
+		if ($teleport) {
+			$this->teleportTicks = 0;
+		}
 		$this->receivedPos = $newPos;
 	}
 
 	public function tick(): void {
+		++$this->teleportTicks;
 		if ($this->newPosRotationIncrements > 0) {
 			$lastPos = clone $this->currentPos;
 			$this->currentPos->x += ($this->receivedPos->x - $this->lastPos->x) / $this->newPosRotationIncrements;
