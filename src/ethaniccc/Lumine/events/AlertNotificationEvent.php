@@ -17,7 +17,7 @@ final class AlertNotificationEvent extends SocketEvent {
 
 	public function __construct(array $data) {
 		$this->alertType = $data["alertType"];
-		$this->alertPacket = is_array($data["alertPacket"]) ? $data["alertPacket"] : unserialize(base64_decode($data["alertPacket"]));
+		$this->alertPackets = is_array($data["alertPacket"]) ? $data["alertPacket"] : unserialize(base64_decode($data["alertPacket"]));
 	}
 
 }

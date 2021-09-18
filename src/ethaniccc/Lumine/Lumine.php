@@ -51,7 +51,7 @@ class Lumine extends PluginBase {
 		PacketPool::getInstance()->registerPacket(new PlayerAuthInputPacket());
 		$this->settings = new Settings($this->getConfig()->getAll());
 		$this->socketThread = new LumineSocketThread($this->settings, $this->getServer()->getLogger());
-		$this->socketThread->start(PTHREADS_INHERIT_NONE);
+		$this->socketThread->start();
 		$this->socketThread->send(new InitDataEvent([
 			"extraData" => [
 				"bedrockKnownStates" => serialize(RuntimeBlockMapping::getInstance()->getBedrockKnownStates()),
