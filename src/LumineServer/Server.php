@@ -13,6 +13,7 @@ use LumineServer\threads\WebhookThread;
 use LumineServer\utils\MCMathHelper;
 use pocketmine\block\BlockFactory;
 use pocketmine\item\ItemFactory;
+use pocketmine\network\mcpe\convert\ItemTranslator;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\snooze\SleeperHandler;
 use pocketmine\snooze\SleeperNotifier;
@@ -125,7 +126,7 @@ final class Server {
 		//BlockFactory::registerBlock(new WoodenFenceOverride(), true);
 		DetectionModule::init();
 		MCMathHelper::init();
-		$this->logger->log("Initialized needed data");
+		$this->logger->log("Initialized data");
 		ini_set("memory_limit", $this->settings->get("memory_limit", "1024M"));
 		$time = round(microtime(true) - $start, 4);
 		$this->logger->log("Lumine server has started in $time seconds");

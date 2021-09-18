@@ -16,6 +16,8 @@ use LumineServer\events\ServerSendPacketEvent;
 use LumineServer\events\SocketEvent;
 use LumineServer\events\UnknownEvent;
 use LumineServer\Server;
+use pocketmine\network\mcpe\convert\ItemTranslator;
+use pocketmine\network\mcpe\convert\ItemTypeDictionary;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\utils\BinaryStream;
@@ -158,6 +160,7 @@ final class SocketHandler {
 								Server::getInstance()->logger->log("Received a player send packet event for {$event->identifier}, but no data was found.");
 								goto finish_read;
 							}
+							$event->packet->decode(); // workaround for incomplete php classes after un-serializing
 							$data->handler->inbound($event->packet, $event->timestamp);
 						} elseif ($event instanceof ServerSendPacketEvent) {
 							$data = Server::getInstance()->dataStorage->get($event->identifier, $client->address);
@@ -165,6 +168,7 @@ final class SocketHandler {
 								Server::getInstance()->logger->log("Received a server send packet event for {$event->identifier}, but no data was found.");
 								goto finish_read;
 							}
+							$event->packet->decode(); // workaround for incomplete php classes after un-serializing
 							$data->handler->outbound($event->packet, $event->timestamp);
 						} elseif ($event instanceof LagCompensationEvent) {
 							$data = Server::getInstance()->dataStorage->get($event->identifier, $client->address);
@@ -182,6 +186,10 @@ final class SocketHandler {
 									$reflection->setStaticPropertyValue("runtimeToLegacyMap", unserialize($event->extraData["runtimeToLegacyMap"]));
 									$reflection->setStaticPropertyValue("legacyToRuntimeMap", unserialize($event->extraData["legacyToRuntimeMap"]));
 									Server::getInstance()->logger->log("RuntimeBlockMapping was initialized");
+									ItemTranslator::setInstance(unserialize($event->extraData["itemTranslator"]));
+									Server::getInstance()->logger->log("ItemTranslator was initialized");
+									ItemTypeDictionary::setInstance(unserialize($event->extraData["itemDictionary"]));
+									Server::getInstance()->logger->log("ItemTypeDictionary was initialized");
 								}
 							}
 						} elseif ($event instanceof CommandRequestEvent) {
