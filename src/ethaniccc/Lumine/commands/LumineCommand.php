@@ -6,12 +6,12 @@ use ethaniccc\Lumine\events\CommandRequestEvent;
 use ethaniccc\Lumine\Lumine;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
-use pocketmine\command\PluginIdentifiableCommand;
-use pocketmine\Player;
-use pocketmine\plugin\Plugin;
+use pocketmine\player\Player;
 use pocketmine\utils\TextFormat;
+use function array_shift;
+use function count;
 
-final class LumineCommand extends Command implements PluginIdentifiableCommand {
+final class LumineCommand extends Command {
 
 	public function __construct() {
 		parent::__construct("anticheat", "The command for the Lumine anti-cheat", "/ac <subcommand>", ["ac"]);
@@ -28,7 +28,7 @@ final class LumineCommand extends Command implements PluginIdentifiableCommand {
 						$this->deny($sender);
 					} else {
 						$this->request(new CommandRequestEvent([
-							"sender" => $sender instanceof Player ? $this->getPlugin()->cache->get($sender) : "CONSOLE",
+							"sender" => $sender instanceof Player ? $this->getPlugin()->cache->get($sender->getNetworkSession()) : "CONSOLE",
 							"commandType" => "logs",
 							"args" => $args
 						]), $sender);

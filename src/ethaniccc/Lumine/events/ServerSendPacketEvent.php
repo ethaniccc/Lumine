@@ -2,15 +2,12 @@
 
 namespace ethaniccc\Lumine\events;
 
-use pocketmine\network\mcpe\protocol\BatchPacket;
-use pocketmine\network\mcpe\protocol\DataPacket;
-
 final class ServerSendPacketEvent extends SocketEvent {
 
 	public const NAME = self::SERVER_SEND_PACKET;
 
 	public string $identifier;
-	public BatchPacket $packet;
+	public BatchPacket $packet; // todo
 	public float $timestamp;
 
 	public function __construct(array $data) {

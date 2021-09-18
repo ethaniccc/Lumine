@@ -2,23 +2,21 @@
 name: Lumine
 version: 1.0-beta
 main: ethaniccc\Lumine\Lumine
-api: 3.22.0
+api: 4.0.0
 permissions:
   ac:
     description: The permission that grants full access to Lumine
     default: op
-    children:
-      ac.command:
-        description: The permission that grants access to all Lumine commands
-        default: op
-        children:
-          ac.command.logs:
-            description: The permission that grants log command access in Lumine
-            default: op
-          ac.command.cooldown:
-            description: The permission that grants alert cooldown command access in Lumine
-            default: op
-      ac.notifications:
-        description: The permission that grants the ability to view Lumine notifcations
-        default: op
+  ac.command:
+    description: The permission that grants access to all Lumine commands
+    default: op
+  ac.command.logs:
+    description: The permission that grants log command access in Lumine
+    default: op
+  ac.command.cooldown:
+    description: The permission that grants alert cooldown command access in Lumine
+    default: op
+  ac.notifications:
+    description: The permission that grants the ability to view Lumine notifcations
+    default: op
 ...

@@ -5,7 +5,7 @@ namespace ethaniccc\Lumine\data\protocol\v428;
 use ethaniccc\Lumine\data\protocol\LegacyItemSlot;
 use pocketmine\item\Item;
 use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\protocol\types\NetworkInventoryAction;
+use pocketmine\network\mcpe\protocol\types\inventory\NetworkInventoryAction;
 
 class UseItemInteractionData {
 

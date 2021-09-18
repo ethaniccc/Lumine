@@ -13,6 +13,8 @@ use ethaniccc\Lumine\thread\LumineSocketThread;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\plugin\PluginBase;
+use ReflectionClass;
+use function serialize;
 
 class Lumine extends PluginBase {
 
@@ -33,22 +35,16 @@ class Lumine extends PluginBase {
 		return self::$instance;
 	}
 
-	public function onEnable() {
-		try {
-			$_ = isset(self::$instance);
-		} catch (\Error $e) {
-			$this->getLogger()->notice("Lumine is already enabled - please make sure you are not reloading the plugin.");
-			$this->getServer()->getPluginManager()->disablePlugin($this);
-		}
+	public function onEnable() : void {
 		self::$instance = $this;
-		$reflection = new \ReflectionClass(RuntimeBlockMapping::class);
-		PacketPool::registerPacket(new PlayerAuthInputPacket());
+		$reflection = new ReflectionClass(RuntimeBlockMapping::class);
+		PacketPool::getInstance()->registerPacket(new PlayerAuthInputPacket());
 		$this->settings = new Settings($this->getConfig()->getAll());
 		$this->socketThread = new LumineSocketThread($this->settings, $this->getServer()->getLogger());
 		$this->socketThread->start(PTHREADS_INHERIT_NONE);
 		$this->socketThread->send(new InitDataEvent([
 			"extraData" => [
-				"bedrockKnownStates" => serialize(RuntimeBlockMapping::getBedrockKnownStates()),
+				"bedrockKnownStates" => serialize(RuntimeBlockMapping::getInstance()->getBedrockKnownStates()),
 				"runtimeToLegacyMap" => serialize($reflection->getStaticPropertyValue("runtimeToLegacyMap")),
 				"legacyToRuntimeMap" => serialize($reflection->getStaticPropertyValue("legacyToRuntimeMap")),
 			]

@@ -5,73 +5,80 @@ namespace ethaniccc\Lumine\data\protocol\v428;
 use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\LegacyItemSlot;
 use pocketmine\math\Vector3;
+use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\types\inventory\ItemStackWrapper;
+use pocketmine\network\mcpe\protocol\types\inventory\NetworkInventoryAction;
 use pocketmine\network\mcpe\protocol\types\inventory\stackrequest\ItemStackRequest;
-use pocketmine\network\mcpe\protocol\types\NetworkInventoryAction;
+use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 
 class PlayerAuthInputPacket extends \pocketmine\network\mcpe\protocol\PlayerAuthInputPacket {
 
+	public int $tick = 0;
 	public ?UseItemInteractionData $itemInteractionData = null;
 	public ?ItemStackRequest $stackRequest = null;
 	/** @var PlayerBlockAction[]|null */
 	public ?array $blockActions = null;
 
 	public static function from(\pocketmine\network\mcpe\protocol\PlayerAuthInputPacket $packet): self {
-		$self = new self($packet->getBuffer());
-		$self->decode();
+		$self = new self();
+		$self->decode(); // todo
 		return $self;
 	}
 
-	protected function decodePayload(): void {
-		parent::decodePayload();
+	protected function decodePayload(PacketSerializer $in): void {
+		parent::decodePayload($in);
 		if (InputConstants::hasFlag($this, InputConstants::PERFORM_ITEM_INTERACTION)) {
 			$this->itemInteractionData = new UseItemInteractionData();
-			$this->itemInteractionData->legacyRequestId = $this->getVarInt();
+			$this->itemInteractionData->legacyRequestId = $in->getVarInt();
 			if ($this->itemInteractionData->legacyRequestId !== 0) {
-				$k = $this->getUnsignedVarInt();
+				$k = $in->getUnsignedVarInt();
 				for ($i = 0; $i < $k; ++$i) {
 					$sl = new LegacyItemSlot();
-					$sl->containerId = $this->getByte();
-					$sl->slots = $this->getString();
+					$sl->containerId = $in->getByte();
+					$sl->slots = $in->getString();
 					$this->itemInteractionData->legacyItemSlots[] = $sl;
 				}
 			}
-			$l = $this->getUnsignedVarInt();
+			$l = $in->getUnsignedVarInt();
 			for ($i = 0; $i < $l; ++$i) {
-				$this->itemInteractionData->actions[] = (new NetworkInventoryAction())->read($this);
+				$this->itemInteractionData->actions[] = (new NetworkInventoryAction())->read($in);
 			}
-			$this->itemInteractionData->actionType = $this->getUnsignedVarInt();
+			$this->itemInteractionData->actionType = $in->getUnsignedVarInt();
 			$x = $y = $z = 0;
-			$this->getBlockPosition($x, $y, $z);
+			$in->getBlockPosition($x, $y, $z);
 			$this->itemInteractionData->blockPos = new Vector3($x, $y, $z);
-			$this->itemInteractionData->blockFace = $this->getVarInt();
-			$this->itemInteractionData->hotbarSlot = $this->getVarInt();
-			$this->itemInteractionData->heldItem = ItemStackWrapper::read($this)->getItemStack();
-			$this->itemInteractionData->playerPos = $this->getVector3();
-			$this->itemInteractionData->clickPos = $this->getVector3();
-			$this->itemInteractionData->blockRuntimeId = $this->getUnsignedVarInt();
+			$this->itemInteractionData->blockFace = $in->getVarInt();
+			$this->itemInteractionData->hotbarSlot = $in->getVarInt();
+			$this->itemInteractionData->heldItem = TypeConverter::getInstance()->netItemStackToCore(ItemStackWrapper::read($in)->getItemStack());
+			$this->itemInteractionData->playerPos = $in->getVector3();
+			$this->itemInteractionData->clickPos = $in->getVector3();
+			$this->itemInteractionData->blockRuntimeId = $in->getUnsignedVarInt();
 		}
 		if (InputConstants::hasFlag($this, InputConstants::PERFORM_ITEM_STACK_REQUEST)) {
-			$this->stackRequest = ItemStackRequest::read($this);
+			$this->stackRequest = ItemStackRequest::read($in);
 		}
 		if (InputConstants::hasFlag($this, InputConstants::PERFORM_BLOCK_ACTIONS)) {
-			$max = $this->getVarInt();
+			$max = $in->getVarInt();
 			for ($i = 0; $i < $max; ++$i) {
 				$action = new PlayerBlockAction();
-				$action->actionType = $this->getVarInt();
+				$action->actionType = $in->getVarInt();
 				switch ($action->actionType) {
 					case PlayerBlockAction::ABORT_BREAK:
 					case PlayerBlockAction::START_BREAK:
 					case PlayerBlockAction::CRACK_BREAK:
 					case PlayerBlockAction::PREDICT_DESTROY:
 					case PlayerBlockAction::CONTINUE:
-						$action->blockPos = new Vector3($this->getVarInt(), $this->getVarInt(), $this->getVarInt());
-						$action->face = $this->getVarInt();
+						$action->blockPos = new Vector3($in->getVarInt(), $in->getVarInt(), $in->getVarInt());
+						$action->face = $in->getVarInt();
 						break;
 				}
 				$this->blockActions[] = $action;
 			}
 		}
+	}
+
+	public function getTick() : int {
+		return $this->tick;
 	}
 
 }

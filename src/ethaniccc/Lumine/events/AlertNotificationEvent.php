@@ -2,14 +2,12 @@
 
 namespace ethaniccc\Lumine\events;
 
-use pocketmine\network\mcpe\protocol\BatchPacket;
-
 final class AlertNotificationEvent extends SocketEvent {
 
 	public const NAME = self::ALERT_NOTIFICATION;
 
 	public string $alertType;
-	public BatchPacket $alertPacket;
+	public BatchPacket $alertPacket; // todo
 
 	public function __construct(array $data) {
 		$this->alertType = $data["alertType"];

@@ -15,21 +15,26 @@ use ethaniccc\Lumine\Lumine;
 use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
 use pocketmine\scheduler\Task;
 use pocketmine\Server;
+use function microtime;
+use function mt_rand;
 
 final class TickingTask extends Task {
 
-	public function onRun(int $currentTick) {
-		if ($currentTick % 20 === 0) {
+	public int $currentTick = 0;
+
+	public function onRun() : void {
+		++$this->currentTick;
+		if ($this->currentTick % 20 === 0) {
 			Lumine::getInstance()->socketThread->send(new HeartbeatEvent());
 			foreach (Lumine::getInstance()->cache->data as $player) {
 				if (!$player->isConnected()) {
-					Lumine::getInstance()->cache->remove($player);
+					Lumine::getInstance()->cache->remove($player->getNetworkSession());
 				}
 			}
 		}
 		$keys = [];
 		foreach (Lumine::getInstance()->listener->locationCompensation as $id => $packet) {
-			$player = Server::getInstance()->getPlayer($id);
+			$player = Server::getInstance()->getPlayerExact($id);
 			$keys[] = $id;
 			if ($player !== null) {
 				$pk = new NetworkStackLatencyPacket();
@@ -37,9 +42,9 @@ final class TickingTask extends Task {
 				$pk->needResponse = true;
 				$packet->addPacket($pk);
 				Lumine::getInstance()->listener->isLumineSentPacket = true;
-				$player->dataPacket($packet);
+				$player->getNetworkSession()->sendDataPacket($packet);
 				Lumine::getInstance()->socketThread->send(new LagCompensationEvent([
-					"identifier" => Lumine::getInstance()->cache->get($player),
+					"identifier" => Lumine::getInstance()->cache->get($player->getNetworkSession()),
 					"timestamp" => $pk->timestamp,
 					"packet" => $packet
 				]));
@@ -62,7 +67,7 @@ final class TickingTask extends Task {
 				$player = Lumine::getInstance()->cache->identify($event->identifier);
 				if ($player !== null) {
 					Lumine::getInstance()->listener->isLumineSentPacket = true;
-					$player->dataPacket($event->packet);
+					$player->getNetworkSession()->sendDataPacket($event->packet);
 				}
 			} elseif ($event instanceof AlertNotificationEvent) {
 				foreach (Server::getInstance()->getOnlinePlayers() as $player) {
@@ -75,9 +80,9 @@ final class TickingTask extends Task {
 							} else {
 								continue;
 							}
-;						}
+						}
 						Lumine::getInstance()->listener->isLumineSentPacket = true;
-						$player->dataPacket($event->alertPacket);
+						$player->getNetworkSession()->sendDataPacket($event->alertPacket);
 					}
 				}
 			} elseif ($event instanceof CommandResponseEvent) {
@@ -85,9 +90,7 @@ final class TickingTask extends Task {
 					Lumine::getInstance()->getLogger()->info($event->response);
 				} else {
 					$player = Lumine::getInstance()->cache->identify($event->target);
-					if ($player !== null) {
-						$player->sendMessage($event->response);
-					}
+					$player?->sendMessage($event->response);
 				}
 			} elseif ($event instanceof BanUserEvent) {
 				Server::getInstance()->getNameBans()->addBan($event->username, $event->reason, $event->expiration, "Lumine AC");

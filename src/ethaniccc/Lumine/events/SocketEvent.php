@@ -22,38 +22,23 @@ abstract class SocketEvent {
 	public const COMMAND_RESPONSE = "command:response";
 
 	public static function get(array $data): SocketEvent {
-		switch ($data["name"] ?? "ERR_NO_NAME") {
-			case self::SOCKET_CONNECT_ERROR:
-				return new ConnectionErrorEvent($data);
-			case self::HEARTBEAT:
-				return new HeartbeatEvent();
-			case self::SOCKET_SEND_ERROR:
-				return new SendErrorEvent();
-			case self::ADD_USER_DATA:
-				return new AddUserDataEvent($data);
-			case self::REMOVE_USER_DATA:
-				return new RemoveUserDataEvent($data);
-			case self::BAN_USER:
-				return new BanUserEvent($data);
-			case self::RESET_ALL_USER_DATA:
-				return new ResetDataEvent();
-			case self::PLAYER_SEND_PACKET:
-				return new PlayerSendPacketEvent($data);
-			case self::SERVER_SEND_PACKET:
-				return new ServerSendPacketEvent($data);
-			case self::LAG_COMPENSATION:
-				return new LagCompensationEvent($data);
-			case self::INIT_DATA:
-				return new InitDataEvent($data);
-			case self::ALERT_NOTIFICATION:
-				return new AlertNotificationEvent($data);
-			case self::COMMAND_REQUEST:
-				return new CommandRequestEvent($data);
-			case self::COMMAND_RESPONSE:
-				return new CommandResponseEvent($data);
-			default:
-				return new UnknownEvent($data);
-		}
+		return match ($data["name"] ?? "ERR_NO_NAME") {
+			self::SOCKET_CONNECT_ERROR => new ConnectionErrorEvent($data),
+			self::HEARTBEAT => new HeartbeatEvent(),
+			self::SOCKET_SEND_ERROR => new SendErrorEvent(),
+			self::ADD_USER_DATA => new AddUserDataEvent($data),
+			self::REMOVE_USER_DATA => new RemoveUserDataEvent($data),
+			self::BAN_USER => new BanUserEvent($data),
+			self::RESET_ALL_USER_DATA => new ResetDataEvent(),
+			self::PLAYER_SEND_PACKET => new PlayerSendPacketEvent($data),
+			self::SERVER_SEND_PACKET => new ServerSendPacketEvent($data),
+			self::LAG_COMPENSATION => new LagCompensationEvent($data),
+			self::INIT_DATA => new InitDataEvent($data),
+			self::ALERT_NOTIFICATION => new AlertNotificationEvent($data),
+			self::COMMAND_REQUEST => new CommandRequestEvent($data),
+			self::COMMAND_RESPONSE => new CommandResponseEvent($data),
+			default => new UnknownEvent($data),
+		};
 	}
 
 }

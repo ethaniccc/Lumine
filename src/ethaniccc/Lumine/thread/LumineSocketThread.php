@@ -2,41 +2,57 @@
 
 namespace ethaniccc\Lumine\thread;
 
+use AttachableThreadedLogger;
 use ethaniccc\Lumine\events\ConnectionErrorEvent;
-use ethaniccc\Lumine\events\HeartbeatEvent;
 use ethaniccc\Lumine\events\SendErrorEvent;
 use ethaniccc\Lumine\events\SocketEvent;
-use ethaniccc\Lumine\events\UnknownEvent;
 use ethaniccc\Lumine\Settings;
-use LumineServer\Server;
-use pocketmine\network\mcpe\NetworkBinaryStream;
-use pocketmine\Thread;
-use pocketmine\utils\BinaryDataException;
-use pocketmine\utils\BinaryStream;
+use Generator;
+use pocketmine\thread\Thread;
+use Threaded;
+use function igbinary_serialize;
+use function igbinary_unserialize;
+use function microtime;
+use function pack;
+use function socket_close;
+use function socket_connect;
+use function socket_create;
+use function socket_last_error;
+use function socket_read;
+use function socket_set_block;
+use function socket_set_nonblock;
+use function socket_strerror;
+use function socket_write;
+use function strlen;
+use function substr;
+use function time_sleep_until;
+use function unpack;
+use function zlib_decode;
+use function zlib_encode;
 
 final class LumineSocketThread extends Thread {
 
 	public const TPS = 1 / 40;
 
-	public \AttachableThreadedLogger $logger;
-	public \Threaded $sendQueue;
-	public \Threaded $receiveQueue;
+	public AttachableThreadedLogger $logger;
+	public Threaded $sendQueue;
+	public Threaded $receiveQueue;
 	public Settings $settings;
 
 	public bool $isAwaitingBuffer = false;
-	public $fullBuffer = "";
+	public string $fullBuffer = "";
 	public int $toRead = 4;
 
-	public function __construct(Settings $settings, \AttachableThreadedLogger $logger) {
-		$this->setClassLoader();
+	public function __construct(Settings $settings, AttachableThreadedLogger $logger) {
+		$this->setClassLoaders();
 		$this->logger = $logger;
-		$this->sendQueue = new \Threaded();
-		$this->receiveQueue = new \Threaded();
+		$this->sendQueue = new Threaded();
+		$this->receiveQueue = new Threaded();
 		$this->settings = $settings;
 	}
 
-	public function run(): void {
-		$this->registerClassLoader();
+	public function onRun(): void {
+		$this->registerClassLoaders();
 		$lastReceiveTime = microtime(true);
 		$tries = 0;
 		/** @var Settings $serverSettings */
@@ -175,7 +191,7 @@ final class LumineSocketThread extends Thread {
 		$this->receiveQueue[] = $event;
 	}
 
-	public function receive(): \Generator {
+	public function receive(): Generator {
 		while (($event = $this->receiveQueue->shift()) !== null) {
 			yield $event;
 		}
