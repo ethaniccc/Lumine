@@ -19,12 +19,6 @@ class PlayerAuthInputPacket extends \pocketmine\network\mcpe\protocol\PlayerAuth
 	/** @var PlayerBlockAction[]|null */
 	public ?array $blockActions = null;
 
-	public static function from(\pocketmine\network\mcpe\protocol\PlayerAuthInputPacket $packet): self {
-		$self = new self();
-		$self->decode(); // todo
-		return $self;
-	}
-
 	protected function decodePayload(PacketSerializer $in): void {
 		parent::decodePayload($in);
 		if (InputConstants::hasFlag($this, InputConstants::PERFORM_ITEM_INTERACTION)) {

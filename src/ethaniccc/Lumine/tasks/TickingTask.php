@@ -67,7 +67,9 @@ final class TickingTask extends Task {
 				$player = Lumine::getInstance()->cache->identify($event->identifier);
 				if ($player !== null) {
 					Lumine::getInstance()->listener->isLumineSentPacket = true;
-					$player->getNetworkSession()->sendDataPacket($event->packet);
+					foreach($event->packets as $serverSendPacket){
+						$player->getNetworkSession()->sendDataPacket($serverSendPacket);
+					}
 				}
 			} elseif ($event instanceof AlertNotificationEvent) {
 				foreach (Server::getInstance()->getOnlinePlayers() as $player) {
@@ -82,7 +84,9 @@ final class TickingTask extends Task {
 							}
 						}
 						Lumine::getInstance()->listener->isLumineSentPacket = true;
-						$player->getNetworkSession()->sendDataPacket($event->alertPacket);
+						foreach($event->alertPackets as $alertPacket){
+							$player->getNetworkSession()->sendDataPacket($alertPacket);
+						}
 					}
 				}
 			} elseif ($event instanceof CommandResponseEvent) {
