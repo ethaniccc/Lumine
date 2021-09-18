@@ -2,6 +2,8 @@
 
 namespace ethaniccc\Lumine;
 
+use function is_array;
+
 final class Settings {
 
 	private array $data;

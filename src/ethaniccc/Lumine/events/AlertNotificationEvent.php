@@ -2,6 +2,9 @@
 
 namespace ethaniccc\Lumine\events;
 
+use function base64_decode;
+use function unserialize;
+
 final class AlertNotificationEvent extends SocketEvent {
 
 	public const NAME = self::ALERT_NOTIFICATION;

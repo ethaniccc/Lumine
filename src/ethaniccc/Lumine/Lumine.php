@@ -13,7 +13,8 @@ use ethaniccc\Lumine\thread\LumineSocketThread;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\plugin\PluginBase;
-use ReflectionClass;
+use ReflectionException;
+use ReflectionProperty;
 use function serialize;
 
 class Lumine extends PluginBase {
@@ -35,9 +36,16 @@ class Lumine extends PluginBase {
 		return self::$instance;
 	}
 
+	/**
+	 * @throws ReflectionException
+	 */
 	public function onEnable() : void {
 		self::$instance = $this;
-		$reflection = new ReflectionClass(RuntimeBlockMapping::class);
+		$rtl = new ReflectionProperty(RuntimeBlockMapping::getInstance(), 'runtimeToLegacyMap');
+		$rtl->setAccessible(true);
+		$ltr = new ReflectionProperty(RuntimeBlockMapping::getInstance(), 'legacyToRuntimeMap');
+		$ltr->setAccessible(true);
+
 		PacketPool::getInstance()->registerPacket(new PlayerAuthInputPacket());
 		$this->settings = new Settings($this->getConfig()->getAll());
 		$this->socketThread = new LumineSocketThread($this->settings, $this->getServer()->getLogger());
@@ -45,8 +53,8 @@ class Lumine extends PluginBase {
 		$this->socketThread->send(new InitDataEvent([
 			"extraData" => [
 				"bedrockKnownStates" => serialize(RuntimeBlockMapping::getInstance()->getBedrockKnownStates()),
-				"runtimeToLegacyMap" => serialize($reflection->getStaticPropertyValue("runtimeToLegacyMap")),
-				"legacyToRuntimeMap" => serialize($reflection->getStaticPropertyValue("legacyToRuntimeMap")),
+				"runtimeToLegacyMap" => serialize($rtl->getValue(RuntimeBlockMapping::getInstance())),
+				"legacyToRuntimeMap" => serialize($ltr->getValue(RuntimeBlockMapping::getInstance())),
 			]
 		])); // init some data the server is going to need
 		$this->listener = new PMListener();
