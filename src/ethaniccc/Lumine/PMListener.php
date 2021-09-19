@@ -200,7 +200,7 @@ final class PMListener implements Listener {
 					foreach ($blocks as $b) {
 						$tile = $player->getWorld()->getTile($b);
 						if ($tile instanceof Spawnable) {
-							$tilePos = $tile->getPos();
+							$tilePos = $tile->getPosition();
 							$player->getNetworkSession()->sendDataPacket(BlockActorDataPacket::create($tilePos->x, $tilePos->y, $tilePos->z, $tile->getSerializedSpawnCompound()));
 						}
 					}
@@ -230,15 +230,15 @@ final class PMListener implements Listener {
 	public function send(DataPacketSendEvent $event): void {
 		foreach($event->getTargets() as $session){
 			$player = $session->getPlayer();
+			if (!$player->isConnected()) {
+				Lumine::getInstance()->cache->remove($session);
+				return;
+			}
+			if (!Lumine::getInstance()->cache->exists($session)) {
+				Lumine::getInstance()->cache->add($player);
+			}
+			$identifier = Lumine::getInstance()->cache->get($session);
 			foreach($event->getPackets() as $packet){
-				if (!$player->isConnected()) {
-					Lumine::getInstance()->cache->remove($session);
-					return;
-				}
-				if (!Lumine::getInstance()->cache->exists($session)) {
-					Lumine::getInstance()->cache->add($player);
-				}
-				$identifier = Lumine::getInstance()->cache->get($session);
 				if ($this->isLumineSentPacket) {
 					$this->isLumineSentPacket = false;
 					return;
@@ -277,12 +277,12 @@ final class PMListener implements Listener {
 					$player->getNetworkSession()->sendDataPacket($latency);
 					$player->getNetworkSession()->sendDataPacket($packet);
 				}
-				Lumine::getInstance()->socketThread->send(new ServerSendPacketEvent([
-					"identifier" => $identifier,
-					"packet" => $packet,
-					"timestamp" => microtime(true)
-				]));
 			}
+			Lumine::getInstance()->socketThread->send(new ServerSendPacketEvent([
+				"identifier" => $identifier,
+				"packet" => $event->getPackets(),
+				"timestamp" => microtime(true)
+			]));
 		}
 	}
 
