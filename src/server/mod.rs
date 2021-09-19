@@ -29,10 +29,8 @@ pub async fn new() -> Result<Server> {
 
 enum Receivable {
     Command(String),
-    Event(Event),
+    Event(events::Event),
 }
-
-enum Event{}
 
 
 pub struct Server {
