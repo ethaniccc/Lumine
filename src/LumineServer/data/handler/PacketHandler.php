@@ -279,14 +279,14 @@ final class PacketHandler {
         if ($data->isClosed) return;
         foreach ($packets as $pk) {
             if (in_array($pk->pid(), self::USED_PACKETS, true)) {
-                if ($pk instanceof LevelChunkPacket) {  // todo
+                if ($pk instanceof LevelChunkPacket) {
                     $chunk = NetworkChunkDeserializer::chunkNetworkDeserialize($pk->getExtraPayload(), $pk->getChunkX(), $pk->getChunkZ(), $pk->getSubChunkCount());
                     if ($data->loggedIn) {
-                        $data->latencyManager->send(function () use ($data, $chunk): void {
-                            $data->world->addChunk($chunk);
+                        $data->latencyManager->send(function () use ($data, $chunk, $pk): void {
+                            $data->world->addChunk($chunk, $pk->getChunkX(), $pk->getChunkZ());
                         });
                     } else {
-                        $data->world->addChunk($chunk);
+                        $data->world->addChunk($chunk, $pk->getChunkX(), $pk->getChunkZ());
                     }
                 } elseif ($pk instanceof NetworkChunkPublisherUpdatePacket) {
                     $data->latencyManager->sandwich(function () use ($data, $pk): void {

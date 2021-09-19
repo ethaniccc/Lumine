@@ -19,14 +19,9 @@ final class VirtualWorld {
 
     public function addChunk(Chunk $chunk, float $chunkX, float $chunkZ): void {
         if (isset($this->chunks[World::chunkHash($chunkX, $chunkZ)])) {
-            $this->removeChunk($chunkX, $chunkZ);
+            unset($this->chunks[World::chunkHash($chunkX, $chunkZ)]);
         }
         $this->chunks[World::chunkHash($chunkX, $chunkZ)] = $chunk;
-    }
-
-    public function removeChunk(int $chunkX, int $chunkZ): void {
-        $this->chunks[World::chunkHash($chunkX, $chunkZ)] = null;
-        unset($this->chunks[World::chunkHash($chunkX, $chunkZ)]);
     }
 
     public function getChunkByHash(int $hash): ?Chunk {
