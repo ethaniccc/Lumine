@@ -1,0 +1,133 @@
+#     __                               __
+#    |  \                             |  \
+#    | $$      __    __  ______ ____   \$$ _______    ______
+#    | $$     |  \  |  \|      \    \ |  \|       \  /      \
+#    | $$     | $$  | $$| $$$$$$\$$$$\| $$| $$$$$$$\|  $$$$$$\
+#    | $$     | $$  | $$| $$ | $$ | $$| $$| $$  | $$| $$    $$
+#    | $$_____| $$__/ $$| $$ | $$ | $$| $$| $$  | $$| $$$$$$$$
+#    | $$     \\$$    $$| $$ | $$ | $$| $$| $$  | $$ \$$     \
+#     \$$$$$$$$ \$$$$$$  \$$  \$$  \$$ \$$ \$$   \$$  \$$$$$$$
+#
+#  Created by ethaniccc @ https://www.github.com/ethaniccc
+# ------------------------------------------------------------------------------
+#  Copyright (C) ethaniccc - All Rights Reserved
+#  Unauthorized copying of this file, via any medium is strictly prohibited
+#  Proprietary and confidential
+#  Written by Benjamin <schooldocumentsandstuff@gmail.com> on July, 2021
+
+bind_address: "0.0.0.0"
+server_port: 3001
+memory_limit: 2048M
+
+prefix: "§l§8[§dL§6u§em§bi§5n§de§8]"
+
+# Tags: {prefix}, {name}, {detection}, {violations}, {debug}
+alert_message: "{prefix} §d{name} §eflagged §b{detection} §7(§cx{violations}§7) §7[{debug}]"
+
+# Whenever a player is unable to respond with a certain packet, they are kicked with this message.
+timeout_message: "NetworkStackLatency timeout\nPlease contact staff if this issue persists"
+
+# Tags: {prefix}, {codename}
+kick_message: "{prefix} You were kicked from the server for potential unfair advantage (code={codename})\nPlease contact staff if this issue persists."
+# Tags: {prefix}, {player}, {codename}, {detection}
+kick_broadcast: "{prefix} §e{player} §7was kicked for §6{detection} §7(§c{codename}§7)"
+
+# E.G - "100 years 100 months 100 days 100 hours 100 minutes 100 seconds"
+# E.G - "2 years 1 month 1 minute 1 second"
+ban_expiration: "7 days"
+# Tags: {prefix}, {codename}, {expiration}
+ban_message: "{prefix} You were banned from the server for potential unfair advantage (code={codename})\nYour ban expires {expiration}\nPlease contact staff if this action was done in error."
+# Tags: {prefix}, {player}, {codename}, {detection}
+ban_broadcast: "{prefix} §e{player} §7was banned for §6{detection} §7(§c{codename}§7)"
+
+webhook:
+  # Link to the webhook (leave as none to keep webhook functionality disabled)
+  link: none
+  # If alerts should be sent in webhook messages
+  alerts: true
+  # If punishments should be sent in webhook messages
+  punishments: true
+
+detections:
+  InvalidMovement:
+    A:
+      enabled: true
+      punishment_type: kick
+      max_vl: 50
+      codename: IMH
+    B:
+      enabled: true
+      punishment_type: kick
+      max_vl: 50
+      codename: IMV
+    C:
+      enabled: true
+      punishment_type: ban
+      max_vl: 10
+      codename: IJT
+  Velocity:
+    A:
+      enabled: true
+      min_pct: 99.99
+      max_pct: 110
+      punishment_type: kick
+      max_vl: 20
+      codename: AVV
+    B:
+      enabled: true
+      min_pct: 99.9
+      max_pct: 150
+      punishment_type: kick
+      max_vl: 20
+      codename: AHV
+  Range:
+    A:
+      enabled: true
+      max_dist: 3.1
+      punishment_type: kick
+      max_vl: 25
+      codename: IRD
+  Killaura:
+    A:
+      enabled: true
+      diff: 4
+      punishment_type: kick
+      max_vl: 10
+      codename: NSK
+  Autoclicker:
+    A:
+      enabled: true
+      max_cps: 23
+      punishment_type: kick
+      max_vl: 15
+      codename: CLB
+    B:
+      enabled: true
+      punishment_type: kick
+      max_vl: 10
+      codename: NDC
+  AimAssist:
+    A:
+      enabled: false
+      correlation: 99.0
+      punishment_type: kick
+      max_vl: 5
+      codename: CAM
+  Auth:
+    A:
+      enabled: true
+      punishment_type: ban
+      max_vl: 1
+      codename: EDA
+  Timer:
+    A:
+      enabled: true
+      punishment_type: kick
+      max_vl: 20
+      codename: TMP
+  BadPackets:
+    A:
+      enabled: true
+      punishment_type: kick
+      max_vl: 20
+      codename: BPA
