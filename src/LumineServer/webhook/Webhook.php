@@ -28,27 +28,27 @@ declare(strict_types=1);
 
 namespace LumineServer\webhook;
 
+use function filter_var;
+
 class Webhook {
 
-	/** @var string */
-	protected $url;
-	/** @var Message */
-	protected $message;
+    protected string $url;
+    protected Message $message;
 
-	public function __construct(string $url, Message $message) {
-		$this->url = $url;
-		$this->message = $message;
-	}
+    public function __construct(string $url, Message $message) {
+        $this->url = $url;
+        $this->message = $message;
+    }
 
-	public function getURL(): string {
-		return $this->url;
-	}
+    public function getURL(): string {
+        return $this->url;
+    }
 
-	public function getMessage(): Message {
-		return $this->message;
-	}
+    public function getMessage(): Message {
+        return $this->message;
+    }
 
-	public function isValid(): bool {
-		return filter_var($this->url, FILTER_VALIDATE_URL) !== false;
-	}
+    public function isValid(): bool {
+        return filter_var($this->url, FILTER_VALIDATE_URL) !== false;
+    }
 }

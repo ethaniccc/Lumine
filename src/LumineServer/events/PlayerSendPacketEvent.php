@@ -2,14 +2,14 @@
 
 namespace LumineServer\events;
 
-use pocketmine\network\mcpe\protocol\DataPacket;
+use pocketmine\network\mcpe\protocol\ServerboundPacket;
 
 final class PlayerSendPacketEvent extends SocketEvent {
 
 	public const NAME = self::PLAYER_SEND_PACKET;
 
 	public string $identifier;
-	public DataPacket $packet;
+	public ServerboundPacket $packet;
 	public float $timestamp;
 
 	public function __construct(array $data) {

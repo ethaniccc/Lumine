@@ -2,12 +2,10 @@
 
 namespace LumineServer\socket;
 
-use Socket;
-
 final class SocketData {
 
     public function __construct(
-    	/** @var resource */
+        /** @var resource */
         public $socket,
         public string $address,
         public float $lastACK
@@ -15,10 +13,8 @@ final class SocketData {
 
     public int $toRead = 4;
     public bool $isAwaitingBuffer = false;
-    /** @var string */
-    public $recvBuffer = "";
-	/** @var string */
-    public $sndBuffer = "";
+    public string $recvBuffer = "";
+    public string $sndBuffer = "";
 
     public float $lastRetryTime = 0.0;
 

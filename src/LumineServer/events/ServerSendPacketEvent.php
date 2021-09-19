@@ -2,19 +2,20 @@
 
 namespace LumineServer\events;
 
-use pocketmine\network\mcpe\protocol\BatchPacket;
+use pocketmine\network\mcpe\protocol\ClientboundPacket;
 
 final class ServerSendPacketEvent extends SocketEvent {
 
 	public const NAME = self::SERVER_SEND_PACKET;
 
 	public string $identifier;
-	public BatchPacket $packet;
+    /** @var ClientboundPacket[] */
+	public array $packets;
 	public float $timestamp;
 
 	public function __construct(array $data) {
 		$this->identifier = $data["identifier"];
-		$this->packet = $data["packet"];
+		$this->packets = $data["packet"];
 		$this->timestamp = $data["timestamp"];
 	}
 

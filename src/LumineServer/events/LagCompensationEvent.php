@@ -10,12 +10,13 @@ final class LagCompensationEvent extends SocketEvent {
 
 	public string $identifier;
 	public int $timestamp;
-	public DataPacket $packet;
+    /** @var DataPacket[] */
+	public array $packets;
 
 	public function __construct(array $data) {
 		$this->identifier = $data["identifier"];
 		$this->timestamp = $data["timestamp"];
-		$this->packet = $data["packet"];
+		$this->packets = $data["packet"];
 	}
 
 }

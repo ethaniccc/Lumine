@@ -2,6 +2,16 @@
 
 namespace LumineServer\utils;
 
+use function array_count_values;
+use function array_sum;
+use function ceil;
+use function count;
+use function floor;
+use function max;
+use function pow;
+use function sort;
+use function sqrt;
+
 /**
  * @author Github Copilot - An absoulte madlad.
  */
@@ -14,11 +24,11 @@ final class MathUtils {
         foreach ($numbers as $number) {
             $sum += pow($number - $mean, 4);
         }
-		$var = ($variance * $variance * $variance);
-		if ($var == 0) {
-			return 0;
-		}
-		return $sum / $var;
+        $var = ($variance * $variance * $variance);
+        if ($var == 0) {
+            return 0;
+        }
+        return $sum / $var;
     }
 
     public static function getMean(array $numbers): float {
@@ -45,11 +55,11 @@ final class MathUtils {
         foreach ($numbers as $number) {
             $sum += pow($number - $mean, 3);
         }
-		$var = ($variance * $stdDev * $stdDev);
-		if ($var == 0) {
-			return 0;
-		}
-		return $sum / $var;
+        $var = ($variance * $stdDev * $stdDev);
+        if ($var == 0) {
+            return 0;
+        }
+        return $sum / $var;
     }
 
     public static function getStandardDeviation(array $numbers): float {
@@ -109,8 +119,8 @@ final class MathUtils {
     }
 
     public static function getCorrelation(array $x, array $y): float {
-        $xMean = self::getMean($x);
-        $yMean = self::getMean($y);
+        //$xMean = self::getMean($x);
+        //$yMean = self::getMean($y);
         $xStdDev = self::getStandardDeviation($x);
         $yStdDev = self::getStandardDeviation($y);
         $covariance = self::getCovariance($x, $y);
@@ -146,9 +156,9 @@ final class MathUtils {
         $xStdDev = self::getStandardDeviation($x);
         $yStdDev = self::getStandardDeviation($y);
         $covariance = self::getCovariance($x, $y);
-		if ($xStdDev * $yStdDev == 0) {
-			return 0;
-		}
+        if ($xStdDev * $yStdDev == 0) {
+            return 0;
+        }
         return $covariance / ($xStdDev * $yStdDev);
     }
 

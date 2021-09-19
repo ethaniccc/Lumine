@@ -4,22 +4,20 @@ namespace LumineServer\utils;
 
 final class Pair {
 
-	/** @var mixed */
-	public $x;
-	/** @var mixed */
-	public $y;
+    public float $x;
+    public float $y;
 
-	public function __construct($x, $y) {
-		$this->x = $x;
-		$this->y = $y;
-	}
+    public function __construct(float $x, float $y) {
+        $this->x = $x;
+        $this->y = $y;
+    }
 
-	public function getX() {
-		return $this->x;
-	}
+    public function getX() : float {
+        return $this->x;
+    }
 
-	public function getY() {
-		return $this->y;
-	}
+    public function getY() : float {
+        return $this->y;
+    }
 
 }
