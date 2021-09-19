@@ -1,8 +1,9 @@
 use crate::server::settings::Settings;
-use tokio::task::JoinHandle;
 use crate::Result;
+use tokio::io::{stdin, BufReader, AsyncBufReadExt};
+use tokio::sync::mpsc::channel;
+use tokio::task::JoinHandle;
 
-type AsyncResult<T, E = Box<dyn std::error::Error + Send>> = std::result::Result<T, E>;
 
 mod settings;
 
@@ -12,24 +13,56 @@ pub async fn new() -> Result<Server> {
     let settings = settings::load(&path)?;
     Ok(Server {
         settings,
-        handles: vec![]
+        running: false,
+        threads: vec![]
     })
+}
+
+enum Receivable {
+    Command(String),
+    Event(Event),
+}
+
+enum Event {
 }
 
 pub struct Server {
     pub settings: Settings,
-    handles: Vec<JoinHandle<AsyncResult<()>>>
+    running: bool,
+    threads: Vec<JoinHandle<()>>,
 }
 
 impl Server {
     pub async fn start(&mut self) -> Result<()>  {
-        self.handles.push(tokio::spawn(async {
-            //while (true)
+        self.running = true;
+        let (mut tx, mut tr) = channel::<Receivable>(2048);
+        self.threads.push(tokio::spawn(async move {
             loop {
-
+                let mut inp = String::new();
+                BufReader::new(stdin()).read_line(&mut inp).await.unwrap();
+                tx.send(Receivable::Command(inp.trim().to_string())).await;
             }
-            Ok(()) as AsyncResult<()>
         }));
+        while self.running {
+            let received = tr.recv().await.unwrap();
+            match received {
+                Receivable::Command(command) => {
+                    match &*command {
+                        "stop" => self.stop(),
+                        _ => println!("Unknown command.")
+                    }
+                },
+                Receivable::Event(event) => {
+
+                }
+            }
+        }
         Ok(())
+    }
+
+    pub fn stop(&mut self) {
+        println!("Shutting down the Lumine server...");
+        self.running = false;
+        std::process::exit(0);
     }
 }
