@@ -1,8 +1,8 @@
 use std::path::Path;
 use serde_derive::{Deserialize, Serialize};
-use tokio::io::{AsyncReadExt};
-use std::io::BufReader;
 use std::fs::File;
+use serde_yaml::Value;
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Settings {
@@ -18,10 +18,7 @@ pub struct Settings {
     pub ban_message: String,
     pub ban_broadcast: String,
     pub webhook: WebhookSettings,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Detector {
+    pub detections: HashMap<String, HashMap<String, HashMap<String, Value>>>
 
 }
 
@@ -32,7 +29,6 @@ pub struct WebhookSettings {
     pub punishments: bool
 }
 
-pub async fn load(path: &Path) -> Result<Settings, Box<dyn std::error::Error>> {
-    let mut f = File::open(path)?;
-    Ok(serde_yaml::from_reader::<File, Settings>(f)?)
+pub fn load(path: &Path) -> Result<Settings, Box<dyn std::error::Error>> {
+    Ok(serde_yaml::from_reader::<File, Settings>(File::open(path)?)?)
 }
