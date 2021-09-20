@@ -1,7 +1,7 @@
 use std::time::SystemTime;
-use byteorder::{WriteBytesExt, BigEndian};
+use byteorder::{WriteBytesExt, BigEndian, ReadBytesExt};
 use crate::Result;
-use std::io::Write;
+use std::io::{Write, Read};
 
 pub enum Event {
     SocketConnectError(String),
@@ -108,6 +108,7 @@ impl Event {
             }
             Event::CommandResponse(target, response) => {
                 buf.write_all(target.as_bytes())?;
+                buf.write
                 buf.write_all(response.as_bytes())?;
             }
             //There is no extra parameters we don't have to encode anything else.
