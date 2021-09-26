@@ -4,6 +4,7 @@ namespace LumineServer\socket;
 
 use LumineServer\data\UserData;
 use LumineServer\events\AddUserDataEvent;
+use LumineServer\events\ChunkSendEvent;
 use LumineServer\events\CommandRequestEvent;
 use LumineServer\events\CommandResponseEvent;
 use LumineServer\events\HeartbeatEvent;
@@ -199,6 +200,16 @@ final class SocketHandler {
                             foreach($event->packets as $packet){
                                 $packet->decode(); // workaround for incomplete php classes after un-serializing TODO
                                 $data->handler->outbound($packet, $event->timestamp);
+                            }
+                        } elseif($event instanceof ChunkSendEvent){
+                            $data = Server::getInstance()->dataStorage->get($event->identifier, $client->address);
+                            //$chunk = NetworkChunkDeserializer::chunkNetworkDeserialize($pk->getExtraPayload(), $event->chunkX, $event->chunkZ, $pk->getSubChunkCount());
+                            if ($data->loggedIn) {
+                                $data->latencyManager->send(function () use ($data, $chunk, $event): void {
+                                    $data->world->addChunk($chunk, $event->chunkX, $event->chunkZ);
+                                });
+                            } else {
+                                $data->world->addChunk($chunk, $event->chunkX, $event->chunkZ);
                             }
                         } elseif ($event instanceof LagCompensationEvent) {
                             $data = Server::getInstance()->dataStorage->get($event->identifier, $client->address);
