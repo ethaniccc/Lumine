@@ -43,3 +43,16 @@ fn string() {
     println!("{:?}", buf);
     println!("{}", String::read(buf.as_slice(), &mut off).unwrap())
 }
+
+#[test]
+fn login_pk() -> std::io::Result<()> {
+    let pk = crate::packets::Packets::Login(crate::packets::Login {
+        client_protocol: 433,
+        connection_request: vec![122,22,22]
+    });
+    println!("{:?}", pk);
+    let mut buf: Vec<u8> = vec![];
+    pk.write(&mut buf);
+    println!("{:?}", crate::packets::Packets::read(buf.as_slice(), &mut 0).unwrap());
+    Ok(())
+}

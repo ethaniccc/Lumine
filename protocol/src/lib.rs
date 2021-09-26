@@ -2,13 +2,15 @@ mod varint;
 #[cfg(test)]
 mod test;
 mod model;
-
+mod packets;
+pub use packets::*;
 use std::ops;
 use derive_more::*;
 use std::io::{Cursor, Error, ErrorKind, Read};
 use crate::varint::{WriteProtocolVarIntExt, ReadProtocolVarIntExt};
-use crate::model::UUID;
+use crate::model::{UUID, Vec3, Vec2};
 use std::convert::TryFrom;
+use byteorder::ReadBytesExt;
 
 /// An error occurred when decoding.
 #[derive(Debug)]
@@ -114,7 +116,7 @@ impl_primitive!(f64, 8);
 /// in UTF-8.
 impl CanIo for String {
     fn write(&self, vec: &mut Vec<u8>) {
-        vec.write_var_u32((vec.len() + self.len()) as u32).unwrap();
+        vec.write_var_u32((self.len()) as u32).unwrap();
         vec.extend_from_slice(self.as_bytes());
     }
 
@@ -140,6 +142,59 @@ impl CanIo for UUID {
     }
 }
 
+impl CanIo for Vec3 {
+    fn write(&self, vec: &mut Vec<u8>) {
+        Little(self.x).write(vec);
+        Little(self.y).write(vec);
+        Little(self.z).write(vec);
+    }
+
+    fn read(src: &[u8], offset: &mut usize) -> Result<Self> {
+        let x = Little::<f32>::read(src, offset)?;
+        let y = Little::<f32>::read(src, offset)?;
+        let z = Little::<f32>::read(src, offset)?;
+        Ok(Self {
+            x: x.inner(),
+            y: y.inner(),
+            z: z.inner()
+        })
+    }
+}
+
+impl CanIo for Vec2 {
+    fn write(&self, vec: &mut Vec<u8>) {
+        Little(self.x).write(vec);
+        Little(self.y).write(vec);
+    }
+
+    fn read(src: &[u8], offset: &mut usize) -> Result<Self> {
+        let x = Little::<f32>::read(src, offset)?;
+        let y = Little::<f32>::read(src, offset)?;
+        Ok(Self {
+            x: x.inner(),
+            y: y.inner(),
+        })
+    }
+}
+
+impl CanIo for Vec<u8> {
+    fn write(&self, vec: &mut Vec<u8>) {
+        vec.write_var_u32((self.len()) as u32).unwrap();
+        vec.extend(self);
+    }
+
+    fn read(src: &[u8], offset: &mut usize) -> Result<Self> {
+        let mut src = Cursor::new(src);
+        src.set_position(*offset as u64);
+        let len = src.read_var_u32()?;
+        let mut vec = Vec::with_capacity(len as usize);
+        for i in 0..len {
+            vec.push(src.read_u8()?);
+        }
+        *offset = src.position() as usize;
+        Ok(vec)
+    }
+}
 
 fn postinc<T>(lvalue: &mut T, rvalue: T) -> T
     where
