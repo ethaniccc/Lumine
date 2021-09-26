@@ -1,5 +1,22 @@
 mod login;
-pub use login::Login;
+mod play_status;
+mod server_to_client_handshake;
+mod client_to_server_handshake;
+mod disconnect;
+// ---
+// ---
+mod text;
+mod set_time;
+
+pub use play_status::*;
+pub use login::*;
+pub use server_to_client_handshake::*;
+pub use client_to_server_handshake::*;
+pub use disconnect::*;
+// ---
+// ---
+pub use text::*;
+pub use set_time::*;
 
 #[macro_export]
 macro_rules! can_io {
@@ -67,5 +84,11 @@ macro_rules! can_io {
 can_io! {
     enum Packets : u8 {
         Login = 0x01,
+        PlayStatus = 0x02,
+        ServerToClientHandshake = 0x03,
+        ClientToServerHandshake = 0x04,
+        Disconnect = 0x05,
+        Text = 0x09,
+        SetTime = 0x0a,
     }
 }

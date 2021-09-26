@@ -1,4 +1,3 @@
-use crate::Little;
 use std::convert::TryFrom;
 
 pub struct Vec3 {
@@ -7,6 +6,7 @@ pub struct Vec3 {
     pub z: f32
 }
 
+#[allow(dead_code)]
 impl Vec3 {
     #[inline]
     pub fn as_array(&self) -> [f32; 3] {
@@ -38,6 +38,7 @@ pub struct Vec2 {
     pub y: f32
 }
 
+#[allow(dead_code)]
 impl Vec2 {
     #[inline]
     pub fn as_array(&self) -> [f32; 2] {

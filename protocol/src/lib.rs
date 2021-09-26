@@ -6,7 +6,7 @@ mod packets;
 pub use packets::*;
 use std::ops;
 use derive_more::*;
-use std::io::{Cursor, Error, ErrorKind, Read};
+use std::io::{Cursor, Error, ErrorKind};
 use crate::varint::{WriteProtocolVarIntExt, ReadProtocolVarIntExt};
 use crate::model::{UUID, Vec3, Vec2};
 use std::convert::TryFrom;
@@ -122,11 +122,15 @@ impl CanIo for String {
         vec.extend_from_slice(self.as_bytes());
     }
 
-    fn read(src: &[u8], _: &mut usize) -> Result<Self> {
+    fn read(src: &[u8], offset: &mut usize) -> Result<Self> {
         let mut src = Cursor::new(src);
+        src.set_position(*offset as u64);
         let len = src.read_var_u32()?;
-        let mut str = String::with_capacity(len as usize);
-        src.read_to_string(&mut str)?;
+        let mut str = String::with_capacity(len.0 as usize);
+        for _ in 0..len.0 {
+            str.push(src.read_u8()? as char)
+        }
+        *offset = src.position() as usize;
         Ok(str)
     }
 }
@@ -189,8 +193,8 @@ impl CanIo for Vec<u8> {
         let mut src = Cursor::new(src);
         src.set_position(*offset as u64);
         let len = src.read_var_u32()?;
-        let mut vec = Vec::with_capacity(len as usize);
-        for i in 0..len {
+        let mut vec = Vec::with_capacity(len.0 as usize);
+        for _ in 0..len.0 {
             vec.push(src.read_u8()?);
         }
         *offset = src.position() as usize;
