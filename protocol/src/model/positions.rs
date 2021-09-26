@@ -3,7 +3,7 @@ use std::convert::TryFrom;
 pub struct Vec3 {
     pub x: f32,
     pub y: f32,
-    pub z: f32
+    pub z: f32,
 }
 
 #[allow(dead_code)]
@@ -23,19 +23,17 @@ impl TryFrom<&[f32]> for Vec3 {
     type Error = std::io::Error;
 
     fn try_from(value: &[f32]) -> Result<Self, Self::Error> {
-        Ok(
-            Self {
-                x: value[0],
-                y: value[1],
-                z: value[2]
-            }
-        )
+        Ok(Self {
+            x: value[0],
+            y: value[1],
+            z: value[2],
+        })
     }
 }
 
 pub struct Vec2 {
     pub x: f32,
-    pub y: f32
+    pub y: f32,
 }
 
 #[allow(dead_code)]
@@ -55,11 +53,9 @@ impl TryFrom<&[f32]> for Vec2 {
     type Error = std::io::Error;
 
     fn try_from(value: &[f32]) -> Result<Self, Self::Error> {
-        Ok(
-            Self {
-                x: value[0],
-                y: value[1]
-            }
-        )
+        Ok(Self {
+            x: value[0],
+            y: value[1],
+        })
     }
 }

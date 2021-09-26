@@ -1,22 +1,28 @@
-mod login;
-mod play_status;
-mod server_to_client_handshake;
+pub mod types;
+
 mod client_to_server_handshake;
 mod disconnect;
-// ---
-// ---
-mod text;
+mod login;
+mod play_status;
+mod resource_pack_client_response;
+mod resource_pack_stack;
+mod resource_packs_info;
+mod server_to_client_handshake;
 mod set_time;
+mod start_game;
+mod text;
 
-pub use play_status::*;
-pub use login::*;
-pub use server_to_client_handshake::*;
 pub use client_to_server_handshake::*;
 pub use disconnect::*;
-// ---
-// ---
-pub use text::*;
+pub use login::*;
+pub use play_status::*;
+pub use resource_pack_client_response::*;
+pub use resource_pack_stack::*;
+pub use resource_packs_info::*;
+pub use server_to_client_handshake::*;
 pub use set_time::*;
+pub use start_game::*;
+pub use text::*;
 
 #[macro_export]
 macro_rules! can_io {
@@ -82,13 +88,17 @@ macro_rules! can_io {
 }
 
 can_io! {
-    enum Packets : u8 {
+    enum Packet : u8 {
         Login = 0x01,
         PlayStatus = 0x02,
         ServerToClientHandshake = 0x03,
         ClientToServerHandshake = 0x04,
         Disconnect = 0x05,
+        ResourcePacksInfo = 0x06,
+        ResourcePackStack = 0x07,
+        ResourcePackClientResponse = 0x08,
         Text = 0x09,
         SetTime = 0x0a,
+        StartGame = 0x0b,
     }
 }

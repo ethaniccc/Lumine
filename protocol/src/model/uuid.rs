@@ -1,18 +1,18 @@
-use byteorder::{ReadBytesExt, LittleEndian};
-use std::io::{Cursor, ErrorKind, Error};
+use byteorder::{LittleEndian, ReadBytesExt};
 use std::convert::TryFrom;
+use std::io::{Cursor, Error, ErrorKind};
 
 #[derive(Debug)]
 pub struct UUID {
     pub parts: Vec<i32>,
-    pub version: Option<i32>
+    pub version: Option<i32>,
 }
 
 impl UUID {
     pub fn new(part1: i32, part2: i32, part3: i32, part4: i32, version: Option<i32>) -> Self {
         Self {
             parts: vec![part1, part2, part3, part4],
-            version
+            version,
         }
     }
 }
@@ -39,7 +39,10 @@ impl TryFrom<&mut Cursor<&[u8]>> for UUID {
 
     fn try_from(buf: &mut Cursor<&[u8]>) -> Result<Self, Self::Error> {
         if buf.clone().into_inner().len() != 16 {
-            return Err(Error::new(ErrorKind::InvalidData, "A valid UUID must only be 16 bytes in length."));
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "A valid UUID must only be 16 bytes in length.",
+            ));
         }
         let part1 = buf.read_i32::<LittleEndian>()?;
         let part0 = buf.read_i32::<LittleEndian>()?;

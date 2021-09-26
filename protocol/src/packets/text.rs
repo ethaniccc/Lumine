@@ -1,10 +1,9 @@
+use crate::varint::{ReadProtocolVarIntExt, WriteProtocolVarIntExt};
 use crate::{can_io, CanIo};
-use crate::varint::{WriteProtocolVarIntExt, ReadProtocolVarIntExt};
-use std::io::{Cursor, Error, ErrorKind};
 use std::convert::TryFrom;
+use std::io::{Cursor, Error, ErrorKind};
 
 impl CanIo for Vec<String> {
-
     fn write(&self, vec: &mut Vec<u8>) {
         vec.write_var_u32((self.len()) as u32).unwrap();
         for str in self {
@@ -68,7 +67,12 @@ impl TryFrom<u8> for Type {
             0x08 => Self::TextTypeAnnouncement,
             0x09 => Self::TextTypeObject,
             0x0A => Self::TextTypeObjectWhisper,
-            _ => return Err(Error::new(ErrorKind::InvalidData, "Invalid PlayStatus Recieved!"))
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "Invalid PlayStatus Received!",
+                ))
+            }
         })
     }
 }

@@ -27,7 +27,12 @@ impl TryFrom<i32> for Status {
             0x05 => Self::PlayStatusLoginFailedVanillaEdu,
             0x06 => Self::PlayStatusLoginFailedEduVanilla,
             0x07 => Self::PlayStatusLoginFailedServerFull,
-            _ => return Err(Error::new(ErrorKind::InvalidData, "Invalid PlayStatus Recieved!"))
+            _ => {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "Invalid PlayStatus Recieved!",
+                ))
+            }
         })
     }
 }

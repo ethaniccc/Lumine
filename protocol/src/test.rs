@@ -1,11 +1,11 @@
-use std::io::Cursor;
-use crate::varint::{WriteProtocolVarIntExt, ReadProtocolVarIntExt};
-use std::convert::{TryFrom};
-use crate::CanIo;
 use crate::model::UUID;
+use crate::varint::{ReadProtocolVarIntExt, WriteProtocolVarIntExt};
+use crate::CanIo;
+use std::convert::TryFrom;
+use std::io::Cursor;
 
 #[test]
-fn vari64() -> std::io::Result<()>{
+fn vari64() -> std::io::Result<()> {
     let buf: Vec<u8> = Vec::new();
     let mut cursor: Cursor<Vec<u8>> = Cursor::new(buf);
     let len = cursor.write_var_u64(1000)?;
@@ -46,31 +46,65 @@ fn string() {
 
 #[test]
 fn login_pk() -> std::io::Result<()> {
-    let pk = crate::packets::Packets::Login(crate::packets::Login {
+    let pk = crate::packets::Packet::Login(crate::packets::Login {
         client_protocol: 433,
-        connection_request: vec![122,22,22]
+        connection_request: vec![122, 22, 22],
     });
     println!("{:?}", pk);
     let mut buf: Vec<u8> = vec![];
     pk.write(&mut buf);
-    println!("{:?}", crate::packets::Packets::read(buf.as_slice(), &mut 0).unwrap());
+    println!(
+        "{:?}",
+        crate::packets::Packet::read(buf.as_slice(), &mut 0).unwrap()
+    );
     Ok(())
 }
 
 #[test]
 fn text_pk() -> std::io::Result<()> {
-    let pk = crate::packets::Packets::Text(crate::packets::Text {
+    let pk = crate::packets::Packet::Text(crate::packets::Text {
         text_type: crate::packets::Type::TextTypeRaw,
         needs_translation: false,
         source_name: "Jviguy".to_string(),
         message: "Why you reading my test cases?".to_string(),
         parameters: vec!["test".to_string()],
         xuid: "cockandballs".to_string(),
-        platform_chat_id: "bruh".to_string()
+        platform_chat_id: "bruh".to_string(),
     });
     println!("{:?}", pk);
     let mut buf: Vec<u8> = vec![];
     pk.write(&mut buf);
-    println!("{:?}", crate::packets::Packets::read(buf.as_slice(), &mut 0).unwrap());
+    println!(
+        "{:?}",
+        crate::packets::Packet::read(buf.as_slice(), &mut 0).unwrap()
+    );
+    Ok(())
+}
+
+#[test]
+fn resource_pack_info_pk() -> std::io::Result<()> {
+    let pk = crate::packets::Packet::ResourcePacksInfo(crate::packets::ResourcePacksInfo {
+        texture_pack_required: false,
+        has_scripts: false,
+        behaviour_packs: vec![crate::packets::types::BehaviourPackInfo {
+            uuid: "12345563-1234-1234-1234-121432456642".to_string(),
+            //IDK
+            version: "2.45.6".to_string(),
+            size: 10,
+            content_key: "balls".to_string(),
+            subpack_name: "Sex".to_string(),
+            content_identity: "".to_string(),
+            has_scripts: false,
+        }],
+        texture_packs: vec![],
+        forcing_server_packs: false,
+    });
+    println!("{:?}", pk);
+    let mut buf: Vec<u8> = vec![];
+    pk.write(&mut buf);
+    println!(
+        "{:?}",
+        crate::packets::Packet::read(buf.as_slice(), &mut 0).unwrap()
+    );
     Ok(())
 }

@@ -1,16 +1,16 @@
-mod varint;
-#[cfg(test)]
-mod test;
 mod model;
 mod packets;
-pub use packets::*;
-use std::ops;
-use derive_more::*;
-use std::io::{Cursor, Error, ErrorKind};
-use crate::varint::{WriteProtocolVarIntExt, ReadProtocolVarIntExt};
-use crate::model::{UUID, Vec3, Vec2};
-use std::convert::TryFrom;
+#[cfg(test)]
+mod test;
+mod varint;
+use crate::model::{Vec2, Vec3, UUID};
+use crate::varint::{ReadProtocolVarIntExt, WriteProtocolVarIntExt};
 use byteorder::ReadBytesExt;
+use derive_more::*;
+pub use packets::*;
+use std::convert::TryFrom;
+use std::io::{Cursor, Error, ErrorKind};
+use std::ops;
 
 /// This is mostly stolen from sofe because its really useful.
 
@@ -21,7 +21,7 @@ pub enum DecodeError {
     OutOfRange,
     InvalidUtf8,
     InvalidData,
-    Unsupported
+    Unsupported,
 }
 
 impl From<std::io::Error> for DecodeError {
@@ -29,14 +29,14 @@ impl From<std::io::Error> for DecodeError {
         match err.kind() {
             ErrorKind::InvalidData => DecodeError::InvalidData,
             ErrorKind::UnexpectedEof => DecodeError::UnexpectedEof,
-            _ => DecodeError::Unsupported
+            _ => DecodeError::Unsupported,
         }
     }
 }
 
 type Result<T = (), E = DecodeError> = std::result::Result<T, E>;
 
-/// Allows the type to be encoded/decoded using RakNet binary format.
+/// Allows the type to be encoded/decoded using mcpe network binary format.
 pub trait CanIo: Sized {
     fn write(&self, vec: &mut Vec<u8>);
 
@@ -162,7 +162,7 @@ impl CanIo for Vec3 {
         Ok(Self {
             x: x.inner(),
             y: y.inner(),
-            z: z.inner()
+            z: z.inner(),
         })
     }
 }
@@ -203,8 +203,8 @@ impl CanIo for Vec<u8> {
 }
 
 fn postinc<T>(lvalue: &mut T, rvalue: T) -> T
-    where
-        T: ops::AddAssign<T> + Clone,
+where
+    T: ops::AddAssign<T> + Clone,
 {
     let clone = lvalue.clone();
     *lvalue += rvalue;
@@ -212,8 +212,8 @@ fn postinc<T>(lvalue: &mut T, rvalue: T) -> T
 }
 
 fn range_inc<T>(lvalue: &mut T, rvalue: T) -> ops::Range<T>
-    where
-        T: ops::AddAssign<T> + Clone,
+where
+    T: ops::AddAssign<T> + Clone,
 {
     let from = lvalue.clone();
     *lvalue += rvalue;

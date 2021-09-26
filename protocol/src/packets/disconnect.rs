@@ -1,4 +1,4 @@
-use crate::{CanIo};
+use crate::CanIo;
 
 #[derive(Debug, Clone)]
 pub struct Disconnect {
@@ -24,7 +24,7 @@ impl CanIo for Disconnect {
         };
         Ok(Self {
             hide_disconnection_screen,
-            message
+            message,
         })
     }
 }

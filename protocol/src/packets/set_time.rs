@@ -1,10 +1,10 @@
+use crate::varint::{ReadProtocolVarIntExt, WriteProtocolVarIntExt};
 use crate::CanIo;
-use crate::varint::{WriteProtocolVarIntExt, ReadProtocolVarIntExt};
 use std::io::Cursor;
 
 #[derive(Debug, Clone)]
 pub struct SetTime {
-    pub time: i32
+    pub time: i32,
 }
 
 impl CanIo for SetTime {
@@ -17,9 +17,6 @@ impl CanIo for SetTime {
         src.set_position(*offset as u64);
         let (time, _) = src.read_var_i32()?;
         *offset = src.position() as usize;
-        Ok(Self {
-            time
-        })
+        Ok(Self { time })
     }
 }
-

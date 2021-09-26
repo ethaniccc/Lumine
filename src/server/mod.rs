@@ -1,18 +1,16 @@
 use crate::server::settings::Settings;
 use crate::Result;
-use tokio::io::{stdin, BufReader, AsyncBufReadExt, AsyncWriteExt, AsyncReadExt};
-use tokio::sync::mpsc::channel;
-use tokio::task::JoinHandle;
-use tokio::net::{TcpListener, TcpStream};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::io::{stdin, AsyncBufReadExt, AsyncReadExt, BufReader};
+use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc::channel;
 use tokio::sync::Mutex;
-use std::borrow::BorrowMut;
-use tokio::prelude::*;
+use tokio::task::JoinHandle;
 
-mod settings;
 mod events;
+mod settings;
 
 pub async fn new() -> Result<Server> {
     let mut path = std::env::current_dir()?;
@@ -23,7 +21,7 @@ pub async fn new() -> Result<Server> {
         running: false,
         tick: 0,
         threads: vec![],
-        clients: Arc::new(Default::default())
+        clients: Arc::new(Default::default()),
     })
 }
 
@@ -32,17 +30,16 @@ enum Receivable {
     Event(events::Event),
 }
 
-
 pub struct Server {
     pub settings: Settings,
     threads: Vec<JoinHandle<()>>,
     running: bool,
     tick: u128,
-    clients: Arc<Mutex<HashMap<SocketAddr, tokio::io::WriteHalf<TcpStream>>>>
+    clients: Arc<Mutex<HashMap<SocketAddr, tokio::io::WriteHalf<TcpStream>>>>,
 }
 
 impl Server {
-    pub async fn start(&mut self) -> Result<()>  {
+    pub async fn start(&mut self) -> Result<()> {
         self.running = true;
         let (mut tx, mut tr) = channel::<Receivable>(2048);
         self.threads.push(tokio::spawn(async move {
@@ -52,12 +49,15 @@ impl Server {
                 tx.send(Receivable::Command(inp.trim().to_string())).await;
             }
         }));
-        let mut listener = TcpListener::bind(self.settings.bind_address.clone() + ":" + &self.settings.server_port.to_string()).await?;
+        let mut listener = TcpListener::bind(
+            self.settings.bind_address.clone() + ":" + &self.settings.server_port.to_string(),
+        )
+        .await?;
         let clients_recv = Arc::clone(&self.clients);
         self.threads.push(tokio::spawn(async move {
             loop {
-                let (mut sock, addr) = listener.accept().await.unwrap();
-                let (mut reader, mut writer) = tokio::io::split(sock);
+                let (sock, addr) = listener.accept().await.unwrap();
+                let (mut reader, writer) = tokio::io::split(sock);
                 let mut tmp = clients_recv.lock().await;
                 tmp.insert(addr, writer);
                 tokio::spawn(async move {
@@ -80,15 +80,11 @@ impl Server {
             self.tick += 1;
             let received = tr.recv().await.unwrap();
             match received {
-                Receivable::Command(command) => {
-                    match &*command {
-                        "stop" => self.stop(),
-                        _ => println!("Unknown command.")
-                    }
+                Receivable::Command(command) => match &*command {
+                    "stop" => self.stop(),
+                    _ => println!("Unknown command."),
                 },
-                Receivable::Event(event) => {
-
-                }
+                Receivable::Event(event) => {}
             }
         }
         Ok(())

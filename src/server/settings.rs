@@ -1,8 +1,8 @@
-use std::path::Path;
 use serde_derive::{Deserialize, Serialize};
-use std::fs::File;
 use serde_yaml::Value;
 use std::collections::HashMap;
+use std::fs::File;
+use std::path::Path;
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Settings {
@@ -18,17 +18,18 @@ pub struct Settings {
     pub ban_message: String,
     pub ban_broadcast: String,
     pub webhook: WebhookSettings,
-    pub detections: HashMap<String, HashMap<String, HashMap<String, Value>>>
-
+    pub detections: HashMap<String, HashMap<String, HashMap<String, Value>>>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct WebhookSettings {
     pub link: Option<String>,
     pub alerts: bool,
-    pub punishments: bool
+    pub punishments: bool,
 }
 
 pub fn load(path: &Path) -> Result<Settings, Box<dyn std::error::Error>> {
-    Ok(serde_yaml::from_reader::<File, Settings>(File::open(path)?)?)
+    Ok(serde_yaml::from_reader::<File, Settings>(File::open(
+        path,
+    )?)?)
 }
