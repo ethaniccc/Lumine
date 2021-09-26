@@ -8,3 +8,4 @@ edition = "2018"
 [dependencies]
 byteorder = "1.4.3"
 hex = "0.4.3"
+derive_more = "0.99.1"

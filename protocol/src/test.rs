@@ -1,6 +1,8 @@
 use std::io::Cursor;
 use crate::varint::{WriteProtocolVarIntExt, ReadProtocolVarIntExt};
 use std::convert::{TryFrom};
+use crate::CanIo;
+use crate::model::UUID;
 
 #[test]
 fn vari64() -> std::io::Result<()>{
@@ -24,7 +26,20 @@ fn vari32() -> std::io::Result<()> {
 
 #[test]
 fn uuid() -> std::io::Result<()> {
-    let str = "12345563-1234-1234-1234-121432456642";
-    println!("{}, {:?}", str, crate::model::UUID::try_from(str.to_string())?);
+    let mut buf: Vec<u8> = Vec::new();
+    let uuid = UUID::try_from("12345563-1234-1234-1234-121432456642".to_string())?;
+    println!("{:?}", uuid);
+    uuid.write(&mut buf);
+    let mut off: usize = 0;
+    println!("{:?}", UUID::read(buf.as_slice(), &mut off).unwrap());
     Ok(())
+}
+
+#[test]
+fn string() {
+    let mut buf: Vec<u8> = Vec::new();
+    "test".to_string().write(&mut buf);
+    let mut off: usize = 0;
+    println!("{:?}", buf);
+    println!("{}", String::read(buf.as_slice(), &mut off).unwrap())
 }
