@@ -12,6 +12,8 @@ use crate::model::{UUID, Vec3, Vec2};
 use std::convert::TryFrom;
 use byteorder::ReadBytesExt;
 
+/// This is mostly stolen from sofe because its really useful.
+
 /// An error occurred when decoding.
 #[derive(Debug)]
 pub enum DecodeError {
