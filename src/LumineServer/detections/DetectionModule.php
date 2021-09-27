@@ -6,6 +6,7 @@ use LumineServer\data\UserData;
 use LumineServer\events\AlertNotificationEvent;
 use LumineServer\Server;
 use LumineServer\Settings;
+use LumineServer\socket\packets\AlertNotificationPacket;
 use LumineServer\webhook\Message;
 use LumineServer\webhook\Embed;
 use LumineServer\webhook\Webhook;
@@ -97,7 +98,7 @@ abstract class DetectionModule {
 			var_export(round($this->violations, 2), true),
 			$debugString
 		], Server::getInstance()->settings->get("alert_message", "{prefix} §e{name} §7failed §e{detection} §7(§cx{violations}§7) §7{debug}"));
-		$this->alert($violationMessage, "violation");
+		$this->alert($violationMessage, AlertNotificationPacket::VIOLATION);
 		$this->sendDiscordAlert($this->data->authData->username, $debugString);
 		Server::getInstance()->logger->log("[{$this->data->authData->username} ({$this->data->currentTick}) @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]");
 	}
@@ -129,7 +130,7 @@ abstract class DetectionModule {
 			"{$this->category} ({$this->subCategory})",
 			$this->settings->get("codename", "???")
 		], Server::getInstance()->settings->get("kick_broadcast"));
-		$this->alert($kickBroadcast, "punishment");
+		$this->alert($kickBroadcast, AlertNotificationPacket::VIOLATION);
 	}
 
 	protected function ban(): void {
@@ -158,7 +159,7 @@ abstract class DetectionModule {
 			"{$this->category} ({$this->subCategory})",
 			$this->settings->get("codename", "???")
 		], Server::getInstance()->settings->get("ban_broadcast"));
-		$this->alert($banBroadcast, "punishment");
+		$this->alert($banBroadcast, AlertNotificationPacket::PUNISHMENT);
 	}
 
 	public function destroy(): void {
@@ -166,19 +167,11 @@ abstract class DetectionModule {
 		unset($this->settings);
 	}
 
-	protected function alert(string $broadcast, string $type): void {
-		$batch = new BatchPacket();
-		$batch->setCompressionLevel(0);
-		$packet = new TextPacket();
-		$packet->sourceName = "";
-		$packet->type = TextPacket::TYPE_CHAT;
+	protected function alert(string $broadcast, int $type): void {
+		$packet = new AlertNotificationPacket();
+		$packet->type = $type;
 		$packet->message = $broadcast;
-		$batch->addPacket($packet);
-		$event = new AlertNotificationEvent([
-			"alertType" => $type,
-			"alertPacket" => $batch
-		]);
-		Server::getInstance()->socketHandler->send($event, $this->data->socketAddress);
+		Server::getInstance()->socketHandler->send($packet, $this->data->socketAddress);
 	}
 
 	protected function sendDiscordAlert(string $player, string $debug): void {

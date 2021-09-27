@@ -29,7 +29,7 @@ final class SubChunkOverride extends SubChunk {
 		$this->attributes[$name] = zlib_encode($value, ZLIB_ENCODING_RAW, 7);
 	}
 
-	public function __get(string $name) {
+	public function &__get(string $name) {
 		$value = $this->attributes[$name] ?? null;
 		if ($value !== null) {
 			$value = zlib_decode($value);

@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "fdbf8b5c539c3c8f4e0f96a15c7435b1",
+    "content-hash": "31bfacda4db53110803b9506e54b2667",
     "packages": [
         {
             "name": "adhocore/json-comment",
@@ -365,16 +365,16 @@
         },
         {
             "name": "pocketmine/pocketmine-mp",
-            "version": "3.22.2",
+            "version": "3.23.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/pmmp/PocketMine-MP.git",
-                "reference": "d670bc8bf8de0fb8eacbe5c29c9032cad5fe14b5"
+                "reference": "14fba366364eca9f13a30b955c702edbd8e66267"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pmmp/PocketMine-MP/zipball/d670bc8bf8de0fb8eacbe5c29c9032cad5fe14b5",
-                "reference": "d670bc8bf8de0fb8eacbe5c29c9032cad5fe14b5",
+                "url": "https://api.github.com/repos/pmmp/PocketMine-MP/zipball/14fba366364eca9f13a30b955c702edbd8e66267",
+                "reference": "14fba366364eca9f13a30b955c702edbd8e66267",
                 "shasum": ""
             },
             "require": {
@@ -411,7 +411,7 @@
                 "pocketmine/spl": "^0.4.0"
             },
             "require-dev": {
-                "phpstan/phpstan": "0.12.92",
+                "phpstan/phpstan": "0.12.98",
                 "phpstan/phpstan-phpunit": "^0.12.6",
                 "phpstan/phpstan-strict-rules": "^0.12.2",
                 "phpunit/phpunit": "^9.2"
@@ -433,11 +433,11 @@
             "license": [
                 "LGPL-3.0"
             ],
-            "description": "A server software for Minecraft: Pocket Edition written in PHP",
+            "description": "A server software for Minecraft: Bedrock Edition written in PHP",
             "homepage": "https://pmmp.io",
             "support": {
                 "issues": "https://github.com/pmmp/PocketMine-MP/issues",
-                "source": "https://github.com/pmmp/PocketMine-MP/tree/3.22.2"
+                "source": "https://github.com/pmmp/PocketMine-MP/tree/3.23.1"
             },
             "funding": [
                 {
@@ -449,7 +449,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2021-08-18T13:14:54+00:00"
+            "time": "2021-09-22T00:00:50+00:00"
         },
         {
             "name": "pocketmine/raklib",

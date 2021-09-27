@@ -2,7 +2,7 @@
 
 namespace LumineServer;
 
-use LumineServer\blocks\WoodenFenceOverride;
+use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use LumineServer\data\DataStorage;
 use LumineServer\data\UserData;
 use LumineServer\detections\DetectionModule;
@@ -12,17 +12,29 @@ use LumineServer\threads\LoggerThread;
 use LumineServer\threads\WebhookThread;
 use LumineServer\utils\MCMathHelper;
 use pocketmine\block\BlockFactory;
+use pocketmine\entity\Attribute;
 use pocketmine\item\ItemFactory;
+use pocketmine\nbt\NetworkLittleEndianNBTStream;
+use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\network\mcpe\convert\ItemTranslator;
+use pocketmine\network\mcpe\convert\ItemTypeDictionary;
+use pocketmine\network\mcpe\convert\R12ToCurrentBlockMapEntry;
+use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
+use pocketmine\network\mcpe\NetworkBinaryStream;
 use pocketmine\network\mcpe\protocol\PacketPool;
+use pocketmine\network\mcpe\protocol\types\ItemTypeEntry;
 use pocketmine\snooze\SleeperHandler;
 use pocketmine\snooze\SleeperNotifier;
+use pocketmine\utils\AssumptionFailedError;
 use pocketmine\utils\TextFormat;
+use ReflectionClass;
+use RuntimeException;
+use UnexpectedValueException;
 
 final class Server {
 
+	public const TPS = 20;
 	private static Server $instance;
-
 	public SocketHandler $socketHandler;
 	public SleeperHandler $tickSleeper;
 	public CommandThread $console;
@@ -35,12 +47,6 @@ final class Server {
 	public int $currentTick = 0;
 	public float $currentTPS = self::TPS;
 
-	public const TPS = 20;
-
-	public static function getInstance(): self {
-		return self::$instance;
-	}
-
 	public function __construct() {
 		self::$instance = $this;
 		@mkdir("logs");
@@ -49,8 +55,12 @@ final class Server {
 		$this->webhookThread = new WebhookThread();
 		$this->dataStorage = new DataStorage();
 		$this->tickSleeper = new SleeperHandler();
-		$this->settings = new Settings(yaml_parse(file_get_contents("./resources/config.yml")));
+		$this->settings = new Settings(yaml_parse(file_get_contents("./resources/config/config.yml")));
 		$this->socketHandler = new SocketHandler($this->settings->get("server_port", 3001));
+	}
+
+	public static function getInstance(): self {
+		return self::$instance;
 	}
 
 	public function run(): void {
@@ -75,7 +85,7 @@ final class Server {
 						break;
 					case "reloadconfig":
 						unset($this->settings);
-						$this->settings = new Settings(yaml_parse(file_get_contents("./resources/config.yml")));
+						$this->settings = new Settings(yaml_parse(file_get_contents("./resources/config/config.yml")));
 						DetectionModule::init();
 						foreach ($this->dataStorage->getAll() as $queue) {
 							foreach ($queue as $data) {
@@ -120,9 +130,18 @@ final class Server {
 		$this->socketHandler->start();
 		$this->logger->log("Socket handler started");
 
+		Attribute::init();
 		PacketPool::init();
+		PacketPool::registerPacket(new PlayerAuthInputPacket());
+		\LumineServer\socket\packets\PacketPool::init();
 		ItemFactory::init();
 		BlockFactory::init();
+		//RuntimeBlockMapping::init();
+		$this->setupRuntimeBlockMapping();
+		//ItemTypeDictionary::getInstance();
+		$this->setupItemTypeDictionary();
+		//ItemTranslator::getInstance();
+		$this->setupItemTranslator();
 		//BlockFactory::registerBlock(new WoodenFenceOverride(), true);
 		DetectionModule::init();
 		MCMathHelper::init();
@@ -157,12 +176,155 @@ final class Server {
 		exit("Terminated.");
 	}
 
-	public function getLuminePrefix(): string {
-		return $this->settings->get("prefix", "§l§8[§dL§6u§em§bi§5n§de§8]") . TextFormat::RESET;
-	}
-
 	public function shutdown(): void {
 		$this->running = false;
+	}
+
+	private function setupRuntimeBlockMapping(): void {
+		$reflection = new ReflectionClass(RuntimeBlockMapping::class);
+		$canonicalBlockStatesFile = file_get_contents("resources/canonical_block_states.nbt");
+		if ($canonicalBlockStatesFile === false) {
+			throw new AssumptionFailedError("Missing required resource file");
+		}
+		$stream = new NetworkBinaryStream($canonicalBlockStatesFile);
+		$list = [];
+		while (!$stream->feof()) {
+			$list[] = $stream->getNbtCompoundRoot();
+		}
+
+		$legacyIdMap = json_decode(file_get_contents("resources/block_id_map.json"), true);
+		/** @var R12ToCurrentBlockMapEntry[] $legacyStateMap */
+		$legacyStateMap = [];
+		$legacyStateMapReader = new NetworkBinaryStream(file_get_contents("resources/r12_to_current_block_map.bin"));
+		$nbtReader = new NetworkLittleEndianNBTStream();
+		while (!$legacyStateMapReader->feof()) {
+			$id = $legacyStateMapReader->getString();
+			$meta = $legacyStateMapReader->getLShort();
+
+			$offset = $legacyStateMapReader->getOffset();
+			$state = $nbtReader->read($legacyStateMapReader->getBuffer(), false, $offset);
+			$legacyStateMapReader->setOffset($offset);
+			if (!($state instanceof CompoundTag)) {
+				throw new RuntimeException("Blockstate should be a TAG_Compound");
+			}
+			$legacyStateMap[] = new R12ToCurrentBlockMapEntry($id, $meta, $state);
+		}
+
+		/**
+		 * @var int[][] $idToStatesMap string id -> int[] list of candidate state indices
+		 */
+		$idToStatesMap = [];
+		foreach ($list as $k => $state) {
+			$idToStatesMap[$state->getString("name")][] = $k;
+		}
+		$legacyToRuntimeMap = [];
+		$runtimeToLegacyMap = [];
+		foreach ($legacyStateMap as $pair) {
+			$id = $legacyIdMap[$pair->getId()] ?? null;
+			if ($id === null) {
+				throw new RuntimeException("No legacy ID matches " . $pair->getId());
+			}
+			$data = $pair->getMeta();
+			if ($data > 15) {
+				//we can't handle metadata with more than 4 bits
+				continue;
+			}
+			$mappedState = $pair->getBlockState();
+
+			//TODO HACK: idiotic NBT compare behaviour on 3.x compares keys which are stored by values
+			$mappedState->setName("");
+			$mappedName = $mappedState->getString("name");
+			if (!isset($idToStatesMap[$mappedName])) {
+				throw new RuntimeException("Mapped new state does not appear in network table");
+			}
+			foreach ($idToStatesMap[$mappedName] as $k) {
+				$networkState = $list[$k];
+				if ($mappedState->equals($networkState)) {
+					$legacyToRuntimeMap[($id << 4) | $data] = $k;
+					$runtimeToLegacyMap[$k] = ($id << 4) | $data;
+					continue 2;
+				}
+			}
+			throw new RuntimeException("Mapped new state does not appear in network table");
+		}
+		$reflection->setStaticPropertyValue("bedrockKnownStates", $list);
+		$reflection->setStaticPropertyValue("runtimeToLegacyMap", $runtimeToLegacyMap);
+		$reflection->setStaticPropertyValue("legacyToRuntimeMap", $legacyToRuntimeMap);
+	}
+
+	private function setupItemTypeDictionary(): void {
+		$data = file_get_contents('resources/required_item_list.json');
+		if ($data === false) throw new AssumptionFailedError("Missing required resource file");
+		$table = json_decode($data, true);
+		if (!is_array($table)) {
+			throw new AssumptionFailedError("Invalid item list format");
+		}
+
+		$params = [];
+		foreach ($table as $name => $entry) {
+			if (!is_array($entry) || !is_string($name) || !isset($entry["component_based"], $entry["runtime_id"]) || !is_bool($entry["component_based"]) || !is_int($entry["runtime_id"])) {
+				throw new AssumptionFailedError("Invalid item list format");
+			}
+			$params[] = new ItemTypeEntry($name, $entry["runtime_id"], $entry["component_based"]);
+		}
+		ItemTypeDictionary::setInstance(new ItemTypeDictionary($params));
+	}
+
+	private function setupItemTranslator(): void {
+		$data = file_get_contents('resources/r16_to_current_item_map.json');
+		if ($data === false) throw new AssumptionFailedError("Missing required resource file");
+		$json = json_decode($data, true);
+		if (!is_array($json) or !isset($json["simple"], $json["complex"]) || !is_array($json["simple"]) || !is_array($json["complex"])) {
+			throw new AssumptionFailedError("Invalid item table format");
+		}
+
+		$legacyStringToIntMapRaw = file_get_contents('resources/item_id_map.json');
+		if ($legacyStringToIntMapRaw === false) {
+			throw new AssumptionFailedError("Missing required resource file");
+		}
+		$legacyStringToIntMap = json_decode($legacyStringToIntMapRaw, true);
+		if (!is_array($legacyStringToIntMap)) {
+			throw new AssumptionFailedError("Invalid mapping table format");
+		}
+
+		/** @phpstan-var array<string, int> $simpleMappings */
+		$simpleMappings = [];
+		foreach ($json["simple"] as $oldId => $newId) {
+			if (!is_string($oldId) || !is_string($newId)) {
+				throw new AssumptionFailedError("Invalid item table format");
+			}
+			if (!isset($legacyStringToIntMap[$oldId])) {
+				//new item without a fixed legacy ID - we can't handle this right now
+				continue;
+			}
+			$simpleMappings[$newId] = $legacyStringToIntMap[$oldId];
+		}
+		foreach ($legacyStringToIntMap as $stringId => $intId) {
+			if (isset($simpleMappings[$stringId])) {
+				throw new UnexpectedValueException("Old ID $stringId collides with new ID");
+			}
+			$simpleMappings[$stringId] = $intId;
+		}
+
+		/** @phpstan-var array<string, array{int, int}> $complexMappings */
+		$complexMappings = [];
+		foreach ($json["complex"] as $oldId => $map) {
+			if (!is_string($oldId) || !is_array($map)) {
+				throw new AssumptionFailedError("Invalid item table format");
+			}
+			foreach ($map as $meta => $newId) {
+				if (!is_numeric($meta) || !is_string($newId)) {
+					throw new AssumptionFailedError("Invalid item table format");
+				}
+				$complexMappings[$newId] = [$legacyStringToIntMap[$oldId], (int)$meta];
+			}
+		}
+
+		ItemTranslator::setInstance(new ItemTranslator(ItemTypeDictionary::getInstance(), $simpleMappings, $complexMappings));
+	}
+
+	public function getLuminePrefix(): string {
+		return $this->settings->get("prefix", "§l§8[§dL§6u§em§bi§5n§de§8]") . TextFormat::RESET;
 	}
 
 }

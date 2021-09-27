@@ -10,19 +10,13 @@ use LumineServer\data\effect\ExtraEffectIds;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\UserData;
 use LumineServer\data\world\NetworkChunkDeserializer;
-use LumineServer\events\LagCompensationEvent;
-use LumineServer\events\SocketEvent;
 use LumineServer\Server;
 use LumineServer\utils\AABB;
 use LumineServer\utils\LevelUtils;
-use pocketmine\block\Block;
 use pocketmine\block\BlockFactory;
-use pocketmine\block\BlockIds;
 use pocketmine\block\Cobweb;
-use pocketmine\block\Ladder;
 use pocketmine\block\Liquid;
 use pocketmine\block\UnknownBlock;
-use pocketmine\block\Vine;
 use pocketmine\entity\Attribute;
 use pocketmine\entity\Effect;
 use pocketmine\entity\Entity;
@@ -55,13 +49,11 @@ use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\SetLocalPlayerAsInitializedPacket;
 use pocketmine\network\mcpe\protocol\SetPlayerGameTypePacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
-use pocketmine\network\mcpe\protocol\types\DeviceOS;
 use pocketmine\network\mcpe\protocol\types\GameMode;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemOnEntityTransactionData;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
 use pocketmine\network\mcpe\protocol\UpdateAttributesPacket;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
-use pocketmine\utils\BinaryStream;
 use pocketmine\utils\TextFormat;
 
 final class PacketHandler {
@@ -278,7 +270,6 @@ final class PacketHandler {
 		if ($data->isClosed) {
 			return;
 		}
-		$packet->decode();
 		foreach ($packet->getPackets() as $buffer) {
 			$pk = PacketPool::getPacket($buffer);
 			if (in_array($pk->pid(), self::USED_PACKETS, true)) {
@@ -360,13 +351,11 @@ final class PacketHandler {
 		}
 	}
 
-	public function compensate(LagCompensationEvent $event): void {
+	public function compensate(DataPacket $packet, int $timestamp): void {
 		$data = $this->data;
 		if ($data->isClosed) {
 			return;
 		}
-		$packet = $event->packet;
-		$timestamp = $event->timestamp;
 		if ($packet instanceof SetActorMotionPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				$data->serverSentMotion = $packet->motion;
@@ -409,17 +398,7 @@ final class PacketHandler {
 				return ($data & (1 << ($flagID))) > 0;
 			};
 			if ($packet->entityRuntimeId === $data->entityRuntimeId) {
-				if ($data->loggedIn) {
-					$data->latencyManager->add($timestamp, function () use ($data, $packet, $isFlagTrueInPropertyMess): void {
-						$hitboxWidth = isset($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH]) ? ($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH][1] / 2) : $data->hitboxWidth;
-						$hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
-						$data->hitboxWidth = $hitboxWidth;
-						$data->hitboxHeight = $hitboxHeight;
-						if (isset($packet->metadata[0])) {
-							$data->isImmobile = $isFlagTrueInPropertyMess(Entity::DATA_FLAG_IMMOBILE, $packet->metadata[0][1]);
-						}
-					});
-				} else {
+				$data->latencyManager->add($timestamp, function () use ($data, $packet, $isFlagTrueInPropertyMess): void {
 					$hitboxWidth = isset($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH]) ? ($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH][1] / 2) : $data->hitboxWidth;
 					$hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
 					$data->hitboxWidth = $hitboxWidth;
@@ -427,14 +406,12 @@ final class PacketHandler {
 					if (isset($packet->metadata[0])) {
 						$data->isImmobile = $isFlagTrueInPropertyMess(Entity::DATA_FLAG_IMMOBILE, $packet->metadata[0][1]);
 					}
-				}
+				});
 			} else {
-				if ($data->loggedIn) {
-					$target = $data->locationMap->get($packet->entityRuntimeId);
-					if ($target !== null) {
-						$target->hitboxWidth = isset($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH]) ? ($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH][1] / 2) : $target->hitboxWidth;
-						$target->hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
-					}
+				$target = $data->locationMap->get($packet->entityRuntimeId);
+				if ($target !== null) {
+					$target->hitboxWidth = isset($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH]) ? ($packet->metadata[Entity::DATA_BOUNDING_BOX_WIDTH][1] / 2) : $target->hitboxWidth;
+					$target->hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
 				}
 			}
 		} elseif ($packet instanceof AddActorPacket || $packet instanceof AddPlayerPacket) {
@@ -468,7 +445,7 @@ final class PacketHandler {
 				while (!$stream->feof()) {
 					$pk = PacketPool::getPacket($stream->getString());
 					$pk->decode();
-					if ($pk instanceof MoveActorAbsolutePacket || $pk instanceof MovePlayerPacket) {
+					if (($pk instanceof MoveActorAbsolutePacket || $pk instanceof MovePlayerPacket) && $pk->entityRuntimeId !== $data->entityRuntimeId) {
 						$target = $data->locationMap->get($pk->entityRuntimeId);
 						if ($target !== null) {
 							if ($pk instanceof MoveActorAbsolutePacket) {
@@ -481,6 +458,8 @@ final class PacketHandler {
 					}
 				}
 			});
+		} else {
+			Server::getInstance()->logger->log("{$data->authData->username}: Got lag compensation for {$packet->getName()} - lag compensation is unhandled");
 		}
 	}
 

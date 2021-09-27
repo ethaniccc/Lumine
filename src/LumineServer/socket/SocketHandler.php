@@ -3,26 +3,17 @@
 namespace LumineServer\socket;
 
 use LumineServer\data\UserData;
-use LumineServer\events\AddUserDataEvent;
-use LumineServer\events\CommandRequestEvent;
-use LumineServer\events\CommandResponseEvent;
-use LumineServer\events\HeartbeatEvent;
-use LumineServer\events\InitDataEvent;
-use LumineServer\events\LagCompensationEvent;
-use LumineServer\events\PlayerSendPacketEvent;
-use LumineServer\events\RemoveUserDataEvent;
-use LumineServer\events\ResetDataEvent;
-use LumineServer\events\ServerSendPacketEvent;
-use LumineServer\events\SocketEvent;
-use LumineServer\events\UnknownEvent;
 use LumineServer\Server;
-use pocketmine\network\mcpe\convert\ItemTranslator;
-use pocketmine\network\mcpe\convert\ItemTypeDictionary;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
+use LumineServer\socket\packets\CommandRequestPacket;
+use LumineServer\socket\packets\CommandResponsePacket;
+use LumineServer\socket\packets\HeartbeatPacket;
+use LumineServer\socket\packets\LagCompensationPacket;
+use LumineServer\socket\packets\Packet;
+use LumineServer\socket\packets\PacketPool;
+use LumineServer\socket\packets\ServerSendDataPacket;
+use LumineServer\socket\packets\UpdateUserPacket;
 use pocketmine\network\mcpe\protocol\BatchPacket;
-use pocketmine\utils\BinaryStream;
-use pocketmine\utils\TextFormat;
-use ReflectionClass;
+use pocketmine\network\mcpe\protocol\UnknownPacket;
 use Socket;
 
 final class SocketHandler {
@@ -80,23 +71,23 @@ final class SocketHandler {
 	}
 
 	/**
-	 * @param SocketEvent $event
+	 * @param Packet $packet
 	 * @param string $socketAddr
 	 */
-	public function send(SocketEvent $event, string $socketAddr): void {
+	public function send(Packet $packet, string $socketAddr): void {
 		$client = $this->clients[$socketAddr] ?? null;
 		if ($client === null) {
-			Server::getInstance()->logger->log("Unable to send packet to {$socketAddr} because it is not connected connected=[" . implode(", ", array_keys($this->clients)) . "]");
+			Server::getInstance()->logger->log("Unable to send packet to $socketAddr because it is not connected connected=[" . implode(", ", array_keys($this->clients)) . "]");
 			return;
 		}
-		$data = (array) $event;
-		$data["name"] = $event::NAME;
-		$write = zlib_encode(igbinary_serialize($data), ZLIB_ENCODING_RAW, 7);
+		$packet->encode();
+		$write = zlib_encode($packet->buffer->getBuffer(), ZLIB_ENCODING_RAW, 7);
 		$buffer = pack("l", strlen($write)) . $write;
 		$len = strlen($buffer);
 		retry_send:
 		$res = @socket_write($client->socket, $buffer);
 		if ($res === false) {
+			Server::getInstance()->logger->log("Unable to send data to {$client->address} - terminating connection");
 			@socket_close($client->socket);
 			unset($this->clients[$client->address]);
 		} elseif ($res !== $len) {
@@ -132,137 +123,65 @@ final class SocketHandler {
 					//Server::getInstance()->logger->log("Need to retry read (remaining={$client->toRead})", false);
 					goto retry_read;
 				} else {
-					$zlibD = zlib_decode($client->recvBuffer);
-					if ($zlibD === false) {
+					$buffer = zlib_decode($client->recvBuffer);
+					if ($buffer === false) {
 						Server::getInstance()->logger->log("Unable to decode buffer from {$client->address}");
 						$toRemove = true;
 						goto end;
 					}
-					$decoded = igbinary_unserialize($zlibD);
-					if ($decoded === false) {
-						Server::getInstance()->logger->log("Unable to binary un-serialize data from {$client->address}");
+					$packet = PacketPool::getPacket($buffer);
+					if ($packet === null) {
+						$len = strlen($buffer);
+						Server::getInstance()->logger->log("Unable to create data from received buffer from {$client->address} (len=$len)");
 						$toRemove = true;
 						goto end;
 					} else {
-						$event = SocketEvent::get($decoded);
-						if ($event instanceof AddUserDataEvent) {
-							Server::getInstance()->dataStorage->add($event->identifier, $client->address);
-							Server::getInstance()->logger->log("Added user data for {$event->identifier}");
-						} elseif ($event instanceof RemoveUserDataEvent) {
-							Server::getInstance()->dataStorage->remove($event->identifier, $client->address);
-							Server::getInstance()->logger->log("Removed user data for {$event->identifier}");
-						} elseif ($event instanceof ResetDataEvent) {
-							Server::getInstance()->dataStorage->reset($client->address);
-							Server::getInstance()->logger->log("Server requested for data removal - request accepted");
-						} elseif ($event instanceof PlayerSendPacketEvent) {
-							$data = Server::getInstance()->dataStorage->get($event->identifier, $client->address);
+						$packet->decode();
+						if ($packet instanceof ServerSendDataPacket) {
+							$data = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
 							if ($data === null) {
-								Server::getInstance()->logger->log("Received a player send packet event for {$event->identifier}, but no data was found.");
+								Server::getInstance()->logger->log("{$packet->identifier} had a packet event, but no data was found");
 								goto finish_read;
 							}
-							$event->packet->decode(); // workaround for incomplete php classes after un-serializing
-							$data->handler->inbound($event->packet, $event->timestamp);
-						} elseif ($event instanceof ServerSendPacketEvent) {
-							$data = Server::getInstance()->dataStorage->get($event->identifier, $client->address);
+							if ($packet->eventType === ServerSendDataPacket::SERVER_SEND_PACKET) {
+								$pk = new BatchPacket($packet->packetBuffer);
+								$pk->decode();
+								$data->handler->outbound($pk, $packet->timestamp);
+							} elseif ($packet->eventType === ServerSendDataPacket::PLAYER_SEND_PACKET) {
+								$pk = \pocketmine\network\mcpe\protocol\PacketPool::getPacket($packet->packetBuffer);
+								$pk->decode();
+								$data->handler->inbound($pk, $packet->timestamp);
+							} else {
+								Server::getInstance()->logger->log("Invalid event type ({$packet->eventType}) received in ServerSendDataPacket");
+							}
+						} elseif ($packet instanceof UpdateUserPacket) {
+							if ($packet->action === UpdateUserPacket::ACTION_ADD) {
+								Server::getInstance()->dataStorage->add($packet->identifier, $client->address);
+								Server::getInstance()->logger->log("Added user data {$packet->identifier}");
+							} elseif ($packet->action === UpdateUserPacket::ACTION_REMOVE) {
+								Server::getInstance()->dataStorage->remove($packet->identifier, $client->address);								Server::getInstance()->logger->log("Added user data {$packet->identifier}");
+								Server::getInstance()->logger->log("Removed user data {$packet->identifier}");
+							} else {
+								Server::getInstance()->logger->log("Invalid action ({$packet->action}) received in UpdateUserPacket");
+							}
+						} elseif ($packet instanceof LagCompensationPacket) {
+							$data = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
 							if ($data === null) {
-								Server::getInstance()->logger->log("Received a server send packet event for {$event->identifier}, but no data was found.");
+								Server::getInstance()->logger->log("{$packet->identifier} had a lag compensation event, but no data was found");
 								goto finish_read;
 							}
-							$event->packet->decode(); // workaround for incomplete php classes after un-serializing
-							$data->handler->outbound($event->packet, $event->timestamp);
-						} elseif ($event instanceof LagCompensationEvent) {
-							$data = Server::getInstance()->dataStorage->get($event->identifier, $client->address);
-							if ($data === null) {
-								Server::getInstance()->logger->log("Received a server send packet event for {$event->identifier}, but no data was found.");
-								goto finish_read;
+							if ($packet->isBatch) {
+								$pk = new BatchPacket($packet->packetBuffer);
+							} else {
+								$pk = \pocketmine\network\mcpe\protocol\PacketPool::getPacket($packet->packetBuffer);
 							}
-							$data->handler->compensate($event);
-						} elseif ($event instanceof InitDataEvent) {
-							if ($event->extraData["bedrockKnownStates"]) {
-								$reflection = new ReflectionClass(RuntimeBlockMapping::class);
-								$property = $reflection->getStaticPropertyValue("bedrockKnownStates");
-								if ($property === null) {
-									$reflection->setStaticPropertyValue("bedrockKnownStates", unserialize($event->extraData["bedrockKnownStates"]));
-									$reflection->setStaticPropertyValue("runtimeToLegacyMap", unserialize($event->extraData["runtimeToLegacyMap"]));
-									$reflection->setStaticPropertyValue("legacyToRuntimeMap", unserialize($event->extraData["legacyToRuntimeMap"]));
-									Server::getInstance()->logger->log("RuntimeBlockMapping was initialized");
-									ItemTranslator::setInstance(unserialize($event->extraData["itemTranslator"]));
-									Server::getInstance()->logger->log("ItemTranslator was initialized");
-									ItemTypeDictionary::setInstance(unserialize($event->extraData["itemDictionary"]));
-									Server::getInstance()->logger->log("ItemTypeDictionary was initialized");
-								}
-							}
-						} elseif ($event instanceof CommandRequestEvent) {
-							switch ($event->commandType) {
-								case "logs":
-									$targetPlayer = array_shift($event->args);
-									if ($targetPlayer === null) {
-										$this->send(new CommandResponseEvent([
-											"target" => $event->sender,
-											"response" => TextFormat::RED . "You need to specify a player to obtain logs"
-										]), $client->address);
-									} else {
-										/** @var string|null $found */
-										$found = null;
-										$name = strtolower($targetPlayer);
-										$delta = PHP_INT_MAX;
-										foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
-											foreach ($queue as $otherData) {
-												/** @var UserData $otherData */
-												$username = $otherData->authData->username;
-												if(stripos($username, $name) === 0){
-													$curDelta = strlen($username) - strlen($name);
-													if($curDelta < $delta){
-														$found = $username;
-														$delta = $curDelta;
-													}
-													if($curDelta === 0){
-														break;
-													}
-												}
-											}
-										}
-										if ($found === null) {
-											$this->send(new CommandResponseEvent([
-												"target" => $event->sender,
-												"response" => TextFormat::RED . "The specified player was not found"
-											]), $client->address);
-										} else {
-											$message = "";
-											if ($event->sender === "CONSOLE") {
-												$message .= PHP_EOL;
-											}
-											$times = 1;
-											foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
-												foreach ($queue as $otherData) {
-													if ($otherData->authData->username === $found) {
-														$message .= TextFormat::GOLD . "Server " . TextFormat::GRAY . "(" . TextFormat::YELLOW . $times . TextFormat::GRAY . "):" . PHP_EOL;
-														$logs = 0;
-														foreach ($otherData->detections as $detection) {
-															if ($detection->violations >= 2) {
-																$message .= TextFormat::AQUA . "(" . TextFormat::LIGHT_PURPLE . var_export(round($detection->violations, 2), true) . TextFormat::AQUA . ") ";
-																$message .= TextFormat::GOLD . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GOLD . ") ";
-																$message .= TextFormat::DARK_GRAY . "- " . TextFormat::WHITE . $detection->description . PHP_EOL;
-																$logs++;
-															}
-														}
-														if ($logs === 0) {
-															$message .= TextFormat::GREEN . "No logs found for {$otherData->authData->username}" . PHP_EOL;
-														}
-														$times++;
-													}
-												}
-											}
-											$this->send(new CommandResponseEvent([
-												"target" => $event->sender,
-												"response" => $message
-											]), $client->address);
-										}
-									}
-									break;
-							}
-						} elseif ($event instanceof UnknownEvent) {
-							Server::getInstance()->logger->log("Got unknown event ({$event->name})");
+							$pk->decode();
+							$data->handler->compensate($pk, $packet->timestamp);
+						} elseif ($packet instanceof CommandRequestPacket) {
+							$pk = new CommandResponsePacket();
+							$pk->target = $packet->sender;
+							$pk->response = "Socket server got command {$packet->command} with args: [" . implode(", ", $packet->args) . "]";
+							$this->send($pk, $client->address);
 						}
 					}
 					finish_read:
@@ -270,6 +189,7 @@ final class SocketHandler {
 					$client->isAwaitingBuffer = false;
 					$client->recvBuffer = "";
 				}
+				unset($packet);
 				goto retry_read;
 			} else {
 				$client->recvBuffer .= $current;
@@ -304,13 +224,15 @@ final class SocketHandler {
 		}
 
 		foreach (Server::getInstance()->dataStorage->getFromSocket($client->address) as $data) {
+			/** @var UserData $data */
 			if ($data->sendPackets > 0) {
 				$data->sendQueue->encode();
-				$this->send(new ServerSendPacketEvent([
-					"identifier" => $data->identifier,
-					"packet" => $data->sendQueue,
-					"timestamp" => microtime(true)
-				]), $client->address);
+				$pk = new ServerSendDataPacket();
+				$pk->eventType = ServerSendDataPacket::SERVER_SEND_PACKET;
+				$pk->identifier = $data->identifier;
+				$pk->packetBuffer = $data->sendQueue->getBuffer();
+				$pk->timestamp = microtime(true);
+				$this->send($pk, $client->address);
 				$data->sendPackets = 0;
 				unset($data->sendQueue);
 				$data->sendQueue = new BatchPacket();
@@ -319,7 +241,7 @@ final class SocketHandler {
 		}
 
 		if (Server::getInstance()->currentTick % Server::TPS === 0 && !$toRemove) {
-			$this->send(new HeartbeatEvent(), $client->address);
+			$this->send(new HeartbeatPacket(), $client->address);
 		}
 
 		if ($toRemove) {

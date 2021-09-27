@@ -29,6 +29,7 @@ use LumineServer\detections\velocity\VelocityA;
 use LumineServer\detections\velocity\VelocityB;
 use LumineServer\events\BanUserEvent;
 use LumineServer\Server;
+use LumineServer\socket\packets\RequestPunishmentPacket;
 use LumineServer\utils\AABB;
 use pocketmine\level\Location;
 use pocketmine\math\Vector3;
@@ -205,19 +206,24 @@ final class UserData {
 	}
 
 	public function kick(string $message = "Lumine - No Reason Provided"): void {
-		$packet = new DisconnectPacket();
+		$packet = new RequestPunishmentPacket();
+		$packet->identifier = $this->identifier;
+		$packet->type = RequestPunishmentPacket::TYPE_KICK;
 		$packet->message = $message;
-		$this->queue($packet);
+		Server::getInstance()->socketHandler->send($packet, $this->socketAddress);
 		$this->isClosed = true;
 	}
 
 	public function ban(string $reason = "Lumine - No Reason Provided", ?DateTime $expiration = null): void {
-		$this->kick($reason);
-		Server::getInstance()->socketHandler->send(new BanUserEvent([
-			"username" => $this->authData->username,
-			"reason" => $reason,
-			"expiration" => $expiration === false ? null : $expiration
-		]), $this->socketAddress);
+		$packet = new RequestPunishmentPacket();
+		$packet->identifier = $this->identifier;
+		$packet->type = RequestPunishmentPacket::TYPE_BAN;
+		$packet->message = $reason;
+		if ($expiration !== null) {
+			$packet->expiration = $expiration->getTimestamp();
+		}
+		Server::getInstance()->socketHandler->send($packet, $this->socketAddress);
+		$this->isClosed = true;
 	}
 
 	public function destroy(): void {
