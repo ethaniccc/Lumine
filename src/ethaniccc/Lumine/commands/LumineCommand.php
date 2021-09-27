@@ -2,8 +2,8 @@
 
 namespace ethaniccc\Lumine\commands;
 
-use ethaniccc\Lumine\events\CommandRequestEvent;
 use ethaniccc\Lumine\Lumine;
+use ethaniccc\Lumine\packets\CommandRequestPacket;
 use pocketmine\command\Command;
 use pocketmine\command\CommandSender;
 use pocketmine\command\PluginIdentifiableCommand;
@@ -24,14 +24,15 @@ final class LumineCommand extends Command implements PluginIdentifiableCommand {
 			$subCommand = array_shift($args);
 			switch ($subCommand) {
 				case "logs":
-					if (!$sender->hasPermission("ac.command.logs")) {
+					if (!$sender->hasPermission("ac.command.$subCommand")) {
 						$this->deny($sender);
 					} else {
-						$this->request(new CommandRequestEvent([
-							"sender" => $sender instanceof Player ? $this->getPlugin()->cache->get($sender) : "CONSOLE",
-							"commandType" => "logs",
-							"args" => $args
-						]), $sender);
+						$packet = new CommandRequestPacket();
+						$packet->sender = $sender instanceof Player ? $this->getPlugin()->cache->get($sender) : "CONSOLE";
+						$packet->command = $subCommand;
+						$packet->args = $args;
+						var_dump($packet->args);
+						$this->request($packet, $sender);
 					}
 					break;
 				case "cooldown":
@@ -51,8 +52,8 @@ final class LumineCommand extends Command implements PluginIdentifiableCommand {
 		return Lumine::getInstance();
 	}
 
-	private function request(CommandRequestEvent $event, CommandSender $sender): void {
-		$this->getPlugin()->socketThread->send($event);
+	private function request(CommandRequestPacket $packet, CommandSender $sender): void {
+		$this->getPlugin()->socketThread->send($packet);
 		$sender->sendMessage(TextFormat::GRAY . "Requesting data from the socket server...");
 	}
 

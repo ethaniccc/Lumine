@@ -5,6 +5,7 @@ namespace ethaniccc\Lumine\data;
 use ethaniccc\Lumine\events\AddUserDataEvent;
 use ethaniccc\Lumine\events\RemoveUserDataEvent;
 use ethaniccc\Lumine\Lumine;
+use ethaniccc\Lumine\packets\UpdateUserPacket;
 use pocketmine\Player;
 
 final class DataCache {
@@ -16,9 +17,10 @@ final class DataCache {
 		$identifier = "{$player->getAddress()}:{$player->getPort()}";
 		unset($this->data[$identifier]);
 		$this->data[$identifier] = &$player;
-		Lumine::getInstance()->socketThread->send(new AddUserDataEvent([
-			"identifier" => $identifier
-		]));
+		$packet = new UpdateUserPacket();
+		$packet->action = UpdateUserPacket::ACTION_ADD;
+		$packet->identifier = $identifier;
+		Lumine::getInstance()->socketThread->send($packet);
 	}
 
 	public function get(Player $player): string {
@@ -36,9 +38,10 @@ final class DataCache {
 	public function remove(Player $player): void {
 		$identifier = "{$player->getAddress()}:{$player->getPort()}";
 		unset($this->data[$identifier]);
-		Lumine::getInstance()->socketThread->send(new RemoveUserDataEvent([
-			"identifier" => $identifier
-		]));
+		$packet = new UpdateUserPacket();
+		$packet->action = UpdateUserPacket::ACTION_REMOVE;
+		$packet->identifier = $identifier;
+		Lumine::getInstance()->socketThread->send($packet);
 	}
 
 }

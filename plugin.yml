@@ -2,7 +2,8 @@
 name: Lumine
 version: 1.0-beta
 main: ethaniccc\Lumine\Lumine
-api: 3.22.0
+api: 3.23.0
+protocol: [465]
 permissions:
   ac:
     description: The permission that grants full access to Lumine

@@ -43,20 +43,11 @@ class Lumine extends PluginBase {
 			$this->getServer()->getPluginManager()->disablePlugin($this);
 		}
 		self::$instance = $this;
-		$reflection = new \ReflectionClass(RuntimeBlockMapping::class);
+		\ethaniccc\Lumine\packets\PacketPool::init();
 		PacketPool::registerPacket(new PlayerAuthInputPacket());
 		$this->settings = new Settings($this->getConfig()->getAll());
 		$this->socketThread = new LumineSocketThread($this->settings, $this->getServer()->getLogger());
 		$this->socketThread->start(PTHREADS_INHERIT_NONE);
-		$this->socketThread->send(new InitDataEvent([
-			"extraData" => [
-				"bedrockKnownStates" => serialize(RuntimeBlockMapping::getBedrockKnownStates()),
-				"runtimeToLegacyMap" => serialize($reflection->getStaticPropertyValue("runtimeToLegacyMap")),
-				"legacyToRuntimeMap" => serialize($reflection->getStaticPropertyValue("legacyToRuntimeMap")),
-				"itemTranslator" => serialize(ItemTranslator::getInstance()),
-				"itemDictionary" => serialize(ItemTypeDictionary::getInstance()),
-			]
-		])); // init some data the server is going to need
 		$this->listener = new PMListener();
 		$this->getServer()->getPluginManager()->registerEvents($this->listener, $this);
 		$this->task = new TickingTask();

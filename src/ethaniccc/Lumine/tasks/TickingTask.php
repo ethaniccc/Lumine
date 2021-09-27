@@ -6,13 +6,20 @@ use ethaniccc\Lumine\events\AlertNotificationEvent;
 use ethaniccc\Lumine\events\BanUserEvent;
 use ethaniccc\Lumine\events\CommandResponseEvent;
 use ethaniccc\Lumine\events\ConnectionErrorEvent;
-use ethaniccc\Lumine\events\HeartbeatEvent;
-use ethaniccc\Lumine\events\LagCompensationEvent;
 use ethaniccc\Lumine\events\SendErrorEvent;
 use ethaniccc\Lumine\events\ServerSendPacketEvent;
 use ethaniccc\Lumine\events\SocketEvent;
 use ethaniccc\Lumine\Lumine;
+use ethaniccc\Lumine\packets\AlertNotificationPacket;
+use ethaniccc\Lumine\packets\CommandResponsePacket;
+use ethaniccc\Lumine\packets\HeartbeatPacket;
+use ethaniccc\Lumine\packets\LagCompensationPacket;
+use ethaniccc\Lumine\packets\Packet;
+use ethaniccc\Lumine\packets\RequestPunishmentPacket;
+use ethaniccc\Lumine\packets\ServerSendDataPacket;
+use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
+use pocketmine\network\mcpe\protocol\TextPacket;
 use pocketmine\scheduler\Task;
 use pocketmine\Server;
 
@@ -20,7 +27,7 @@ final class TickingTask extends Task {
 
 	public function onRun(int $currentTick) {
 		if ($currentTick % 20 === 0) {
-			Lumine::getInstance()->socketThread->send(new HeartbeatEvent());
+			Lumine::getInstance()->socketThread->send(new HeartbeatPacket());
 			foreach (Lumine::getInstance()->cache->data as $player) {
 				if (!$player->isConnected()) {
 					Lumine::getInstance()->cache->remove($player);
@@ -28,46 +35,41 @@ final class TickingTask extends Task {
 			}
 		}
 		$keys = [];
-		foreach (Lumine::getInstance()->listener->locationCompensation as $id => $packet) {
+		foreach (Lumine::getInstance()->listener->locationCompensation as $id => $bpk) {
 			$player = Server::getInstance()->getPlayer($id);
 			$keys[] = $id;
 			if ($player !== null) {
-				$pk = new NetworkStackLatencyPacket();
-				$pk->timestamp = mt_rand(1, 1000000000000) * 1000;
-				$pk->needResponse = true;
-				$packet->addPacket($pk);
+				$pkK = new NetworkStackLatencyPacket();
+				$pkK->timestamp = mt_rand(1, 100000) * 1000;
+				$pkK->needResponse = true;
+				$bpk->addPacket($pkK);
+				$bpk->encode();
 				Lumine::getInstance()->listener->isLumineSentPacket = true;
-				$player->dataPacket($packet);
-				Lumine::getInstance()->socketThread->send(new LagCompensationEvent([
-					"identifier" => Lumine::getInstance()->cache->get($player),
-					"timestamp" => $pk->timestamp,
-					"packet" => $packet
-				]));
+				$player->dataPacket($bpk);
+				$spk = new LagCompensationPacket();
+				$spk->identifier = Lumine::getInstance()->cache->get($player);
+				$spk->timestamp = $pkK->timestamp;
+				$spk->packetBuffer = $bpk->getBuffer();
+				$spk->isBatch = true;
+				Lumine::getInstance()->socketThread->send($spk);
 			}
 		}
 		foreach ($keys as $key) {
 			unset(Lumine::getInstance()->listener->locationCompensation[$key]);
 		}
-		foreach (Lumine::getInstance()->socketThread->receive() as $event) {
-			/** @var SocketEvent $event */
-			if ($event instanceof ConnectionErrorEvent) {
-				Lumine::getInstance()->getLogger()->error($event->message);
-				Lumine::getInstance()->socketThread->quit();
-				//Server::getInstance()->getPluginManager()->disablePlugin(Lumine::getInstance());
-			} elseif ($event instanceof SendErrorEvent) {
-				Lumine::getInstance()->getLogger()->error("Unable to send an event to the remote server.");
-				Lumine::getInstance()->socketThread->quit();
-				//Server::getInstance()->getPluginManager()->disablePlugin(Lumine::getInstance());
-			} elseif ($event instanceof ServerSendPacketEvent) {
-				$player = Lumine::getInstance()->cache->identify($event->identifier);
+		foreach (Lumine::getInstance()->socketThread->receive() as $packet) {
+			if ($packet instanceof ServerSendDataPacket && $packet->eventType === ServerSendDataPacket::SERVER_SEND_PACKET) {
+				$player = Lumine::getInstance()->cache->identify($packet->identifier);
 				if ($player !== null) {
 					Lumine::getInstance()->listener->isLumineSentPacket = true;
-					$player->dataPacket($event->packet);
+					$batch = new BatchPacket($packet->packetBuffer);
+					$batch->isEncoded = true;
+					$player->dataPacket($batch);
 				}
-			} elseif ($event instanceof AlertNotificationEvent) {
+			} elseif ($packet instanceof AlertNotificationPacket) {
 				foreach (Server::getInstance()->getOnlinePlayers() as $player) {
 					if ($player->hasPermission("ac.notifications")) {
-						if ($event->alertType !== "punishment") {
+						if ($packet->type !== AlertNotificationPacket::PUNISHMENT) {
 							$diff = microtime(true) - Lumine::getInstance()->lastAlertTimes[$player->getName()];
 							$cooldown = Lumine::getInstance()->alertCooldowns[$player->getName()];
 							if ($diff >= $cooldown) {
@@ -76,21 +78,32 @@ final class TickingTask extends Task {
 								continue;
 							}
 ;						}
-						Lumine::getInstance()->listener->isLumineSentPacket = true;
-						$player->dataPacket($event->alertPacket);
+						$player->sendMessage($packet->message);
 					}
 				}
-			} elseif ($event instanceof CommandResponseEvent) {
-				if ($event->target === "CONSOLE") {
-					Lumine::getInstance()->getLogger()->info($event->response);
+			} elseif ($packet instanceof CommandResponsePacket) {
+				if ($packet->target === "CONSOLE") {
+					Lumine::getInstance()->getLogger()->info($packet->response);
 				} else {
-					$player = Lumine::getInstance()->cache->identify($event->target);
+					$player = Lumine::getInstance()->cache->identify($packet->target);
 					if ($player !== null) {
-						$player->sendMessage($event->response);
+						$player->sendMessage($packet->response);
 					}
 				}
-			} elseif ($event instanceof BanUserEvent) {
-				Server::getInstance()->getNameBans()->addBan($event->username, $event->reason, $event->expiration, "Lumine AC");
+			} elseif ($packet instanceof RequestPunishmentPacket) {
+				$player = Lumine::getInstance()->cache->identify($packet->identifier);
+				if ($player !== null) {
+					if ($packet->type === RequestPunishmentPacket::TYPE_KICK) {
+						$player->kick($packet->message, false);
+					} elseif ($packet->type === RequestPunishmentPacket::TYPE_BAN) {
+						$player->kick($packet->message, false);
+						$date = new \DateTime();
+						$date->setTimestamp($packet->expiration);
+						Server::getInstance()->getNameBans()->addBan($player->getName(), $packet->message, $date, "Lumine AC");
+					} else {
+						Lumine::getInstance()->getLogger()->error("Unknown punishment type {$packet->type}");
+					}
+				}
 			}
 		}
 	}

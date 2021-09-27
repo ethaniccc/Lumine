@@ -5,9 +5,8 @@ namespace ethaniccc\Lumine;
 use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use ethaniccc\Lumine\data\protocol\v428\PlayerBlockAction;
-use ethaniccc\Lumine\events\LagCompensationEvent;
-use ethaniccc\Lumine\events\PlayerSendPacketEvent;
-use ethaniccc\Lumine\events\ServerSendPacketEvent;
+use ethaniccc\Lumine\packets\LagCompensationPacket;
+use ethaniccc\Lumine\packets\ServerSendDataPacket;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerPreLoginEvent;
 use pocketmine\event\player\PlayerQuitEvent;
@@ -20,6 +19,7 @@ use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\network\mcpe\protocol\PlayerActionPacket;
 use pocketmine\network\mcpe\protocol\ProtocolInfo;
+use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementSettings;
 use pocketmine\network\mcpe\protocol\types\PlayerMovementType;
@@ -214,11 +214,12 @@ final class PMListener implements Listener {
 			}
 		}
 		if (!$packet instanceof BatchPacket) {
-			Lumine::getInstance()->socketThread->send(new PlayerSendPacketEvent([
-				"identifier" => $identifier,
-				"packet" => $packet,
-				"timestamp" => microtime(true)
-			]));
+			$pk = new ServerSendDataPacket();
+			$pk->eventType = ServerSendDataPacket::PLAYER_SEND_PACKET;
+			$pk->packetBuffer = $packet->getBuffer();
+			$pk->identifier = $identifier;
+			$pk->timestamp = microtime(true);
+			Lumine::getInstance()->socketThread->send($pk);
 		}
 	}
 
@@ -233,11 +234,6 @@ final class PMListener implements Listener {
 			Lumine::getInstance()->cache->add($player);
 		}
 		$identifier = Lumine::getInstance()->cache->get($player);
-		if ($this->isLumineSentPacket) {
-			$this->isLumineSentPacket = false;
-			return;
-		}
-
 		if ($packet instanceof StartGamePacket) {
 			$packet->playerMovementSettings = new PlayerMovementSettings(
 				PlayerMovementType::SERVER_AUTHORITATIVE_V2_REWIND,
@@ -245,6 +241,10 @@ final class PMListener implements Listener {
 				false // as if this even matters *cough*
 			);
 		} elseif ($packet instanceof BatchPacket) {
+			if ($this->isLumineSentPacket) {
+				$this->isLumineSentPacket = false;
+				return;
+			}
 			if ($packet->getCompressionLevel() > 0) {
 				$packet->decode();
 			}
@@ -253,10 +253,13 @@ final class PMListener implements Listener {
 				$pk = PacketPool::getPacket($buffer);
 				if (in_array($pk->pid(), self::USED_PACKETS, true)) {
 					$pk->decode();
-					if (($pk instanceof MovePlayerPacket || $pk instanceof MoveActorAbsolutePacket) && $pk->entityRuntimeId !== $player->getId()) {
+					if (($pk instanceof MovePlayerPacket || $pk instanceof MoveActorAbsolutePacket)) {
+						if ($pk->entityRuntimeId !== $player->getId()) {
+							continue;
+						}
 						if (!isset($this->locationCompensation[$player->getName()])) {
 							$this->locationCompensation[$player->getName()] = new BatchPacket();
-							$this->locationCompensation[$player->getName()]->setCompressionLevel(4);
+							$this->locationCompensation[$player->getName()]->setCompressionLevel(7);
 						}
 						$this->locationCompensation[$player->getName()]->addPacket($pk);
 						if (count($gen) === 1) {
@@ -266,28 +269,31 @@ final class PMListener implements Listener {
 							$packet->payload = str_replace(Binary::writeUnsignedVarInt(strlen($pk->buffer)) . $pk->buffer, "", $packet->payload);
 						}
 						continue;
+					} elseif ($pk instanceof SetActorMotionPacket && $pk->entityRuntimeId !== $player->getId()) {
+						continue;
 					}
 					$compensation = new BatchPacket();
 					$compensation->setCompressionLevel(0);
 					$var1 = new NetworkStackLatencyPacket();
-					$var1->timestamp = mt_rand(1, 10000000000) * 1000;
+					$var1->timestamp = mt_rand(1, 100000) * 1000;
 					$var1->needResponse = true;
 					$compensation->addPacket($var1);
 					$compensation->addPacket($pk);
-					Lumine::getInstance()->socketThread->send(new LagCompensationEvent([
-						"identifier" => $identifier,
-						"timestamp" => $var1->timestamp,
-						"packet" => $pk
-					]));
+					$cpk = new LagCompensationPacket();
+					$cpk->identifier = $identifier;
+					$cpk->timestamp = $var1->timestamp;
+					$cpk->packetBuffer = $pk->getBuffer();
+					Lumine::getInstance()->socketThread->send($cpk);
 					$this->isLumineSentPacket = true;
 					$player->dataPacket($compensation);
 				}
 			}
-			Lumine::getInstance()->socketThread->send(new ServerSendPacketEvent([
-				"identifier" => $identifier,
-				"packet" => $packet,
-				"timestamp" => microtime(true)
-			]));
+			$sspk = new ServerSendDataPacket();
+			$sspk->identifier = $identifier;
+			$sspk->eventType = ServerSendDataPacket::SERVER_SEND_PACKET;
+			$sspk->packetBuffer = $packet->getBuffer();
+			$sspk->timestamp = microtime(true);
+			Lumine::getInstance()->socketThread->send($sspk);
 		}
 	}
 

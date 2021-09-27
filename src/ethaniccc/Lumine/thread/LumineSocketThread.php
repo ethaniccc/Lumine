@@ -7,6 +7,8 @@ use ethaniccc\Lumine\events\HeartbeatEvent;
 use ethaniccc\Lumine\events\SendErrorEvent;
 use ethaniccc\Lumine\events\SocketEvent;
 use ethaniccc\Lumine\events\UnknownEvent;
+use ethaniccc\Lumine\packets\Packet;
+use ethaniccc\Lumine\packets\PacketPool;
 use ethaniccc\Lumine\Settings;
 use LumineServer\Server;
 use pocketmine\network\mcpe\NetworkBinaryStream;
@@ -37,6 +39,7 @@ final class LumineSocketThread extends Thread {
 
 	public function run(): void {
 		$this->registerClassLoader();
+		PacketPool::init();
 		$lastReceiveTime = microtime(true);
 		$tries = 0;
 		/** @var Settings $serverSettings */
@@ -45,8 +48,8 @@ final class LumineSocketThread extends Thread {
 			"port" => 3001
 		]));
 		$sendSocket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
-		if (!socket_connect($sendSocket, $serverSettings->get("address", "127.0.0.1"), $serverSettings->get("port", 3001))) {
-			$this->queueReceive(new ConnectionErrorEvent(["message" => "Unable to establish first connection to the server. Check that the server is online."]));
+		if (!@socket_connect($sendSocket, $serverSettings->get("address", "127.0.0.1"), $serverSettings->get("port", 3001))) {
+			$this->logger->error("Unable to establish initial connection to socket server - make sure it's running");
 			$this->isKilled = true;
 			goto end;
 		}
@@ -58,10 +61,7 @@ final class LumineSocketThread extends Thread {
 			$current = @socket_read($sendSocket, $this->toRead);
 			if ($current === "") {
 				$error = socket_last_error($sendSocket);
-				$this->logger->info("[$error] " . socket_strerror($error));
-				$this->queueReceive(new ConnectionErrorEvent([
-					"message" => "Unable to read buffer from the external socket server (check if the server is still running)"
-				]));
+				$this->logger->error("[Socket Error $error] " . socket_strerror($error));
 				$this->isKilled = true;
 				goto end;
 			} elseif ($current !== false) {
@@ -72,24 +72,19 @@ final class LumineSocketThread extends Thread {
 					if ($length !== $this->toRead) {
 						$this->toRead -= $length;
 					} else {
-						$zlibD = zlib_decode($this->fullBuffer);
-						if ($zlibD === false) {
-							$this->queueReceive(new ConnectionErrorEvent([
-								"message" => "Unable to decode data"
-							]));
+						$decoded = zlib_decode($this->fullBuffer);
+						if ($decoded === false) {
 							$this->isKilled = true;
 							goto end;
 						}
-						$decoded = igbinary_unserialize($zlibD);
-						if ($decoded === false || $decoded === null) {
-							$this->queueReceive(new ConnectionErrorEvent([
-								"message" => "Unable to binary un-serialize data"
-							]));
+						$packet = PacketPool::getPacket($decoded);
+						if ($packet === null) {
+							$this->logger->error("Unknown packet received from the socket server");
 							$this->isKilled = true;
 							goto end;
 						}
-						$event = SocketEvent::get($decoded);
-						$this->queueReceive($event);
+						$packet->decode();
+						$this->queueReceive($packet);
 						$this->fullBuffer = "";
 						$this->toRead = 4;
 						$this->isAwaitingBuffer = false;
@@ -107,7 +102,8 @@ final class LumineSocketThread extends Thread {
 							$this->toRead = $unpacked;
 							$this->isAwaitingBuffer = true;
 						} else {
-							$this->logger->info("Unable to unpack read length");
+							$this->logger->error("Unable to unpack read length");
+							$this->isKilled = true;
 							goto end;
 						}
 						$this->fullBuffer = "";
@@ -116,21 +112,19 @@ final class LumineSocketThread extends Thread {
 			}
 			// now we get everything from the send queue and send stuff to the socket server
 			socket_set_block($sendSocket);
-			while (($event = $this->sendQueue->shift()) !== null) {
-				$event = igbinary_unserialize($event);
-				$data = (array) $event;
-				$data["name"] = $event::NAME;
-				$write = zlib_encode(igbinary_serialize($data), ZLIB_ENCODING_RAW, 7);
+			while (($packet = $this->sendQueue->shift()) !== null) {
+				/** @var Packet $packet */
+				$packet->encode();
+				$write = zlib_encode($packet->buffer->getBuffer(), ZLIB_ENCODING_RAW, 7);
 				$buffer = pack("l", strlen($write)) . $write;
 				retry_send:
 				$len = strlen($buffer);
 				$start = microtime(true);
 				$res = @socket_write($sendSocket, $buffer, $len);
 				if ($res === false) {
-					$this->logger->info("Failed to write $len bytes after " . (microtime(true) - $start) . " seconds");
+					$this->logger->error("Failed to write $len bytes after " . (microtime(true) - $start) . " seconds");
 					$error = socket_last_error($sendSocket);
-					$this->logger->info("[$error] " . socket_strerror($error));
-					$this->queueReceive(new SendErrorEvent());
+					$this->logger->info("[Socket Error $error] " . socket_strerror($error));
 					$this->isKilled = true;
 					goto end;
 				} elseif ($res !== $len) {
@@ -143,10 +137,8 @@ final class LumineSocketThread extends Thread {
 			if (microtime(true) - $lastReceiveTime >= 20 + $sendDelta) {
 				if (++$tries >= 10) {
 					$error = socket_last_error($sendSocket);
-					$this->logger->info("[$error] " . socket_strerror($error));
-					$this->queueReceive(new ConnectionErrorEvent([
-						"message" => "Timed out, received no heartbeats from the server after 20 seconds"
-					]));
+					$this->logger->info("[Socket Error $error] " . socket_strerror($error));
+					$this->logger->error("Timed out - no heartbeats after 20 seconds");
 					$this->isKilled = true;
 					goto end;
 				}
@@ -164,20 +156,20 @@ final class LumineSocketThread extends Thread {
 		socket_close($sendSocket);
 	}
 
-	public function send(SocketEvent $event): void {
+	public function send(Packet $packet): void {
 		if ($this->isKilled) {
 			return;
 		}
-		$this->sendQueue[] = igbinary_serialize($event);
+		$this->sendQueue[] = $packet;
 	}
 
-	public function queueReceive(SocketEvent $event): void {
-		$this->receiveQueue[] = $event;
+	public function queueReceive(Packet $packet): void {
+		$this->receiveQueue[] = $packet;
 	}
 
 	public function receive(): \Generator {
-		while (($event = $this->receiveQueue->shift()) !== null) {
-			yield $event;
+		while (($packet = $this->receiveQueue->shift()) !== null) {
+			yield $packet;
 		}
 	}
 
