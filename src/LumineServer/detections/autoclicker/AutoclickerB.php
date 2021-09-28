@@ -4,6 +4,7 @@ namespace LumineServer\detections\autoclicker;
 
 use LumineServer\data\UserData;
 use LumineServer\detections\DetectionModule;
+use LumineServer\utils\MathUtils;
 use pocketmine\network\mcpe\protocol\DataPacket;
 
 class AutoclickerB extends DetectionModule {
@@ -24,6 +25,12 @@ class AutoclickerB extends DetectionModule {
 						"cps" => $data->clickData->cps
 					]);
 				}
+				/* $kurtosis = MathUtils::getKurtosis($this->samples);
+				$skewness = MathUtils::getSkewness($this->samples);
+				$average = MathUtils::getAverage($this->samples);
+				$outliers = MathUtils::getOutliers($this->samples);
+				$deviation = MathUtils::getStandardDeviation($this->samples);
+				$data->message("({$data->currentTick}) k=$kurtosis s=$skewness avg=$average o=$outliers dev=$deviation"); */
 				$this->samples = [];
 			}
 		}

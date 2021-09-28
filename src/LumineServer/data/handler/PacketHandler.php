@@ -414,11 +414,11 @@ final class PacketHandler {
 					$target->hitboxHeight = $packet->metadata[Entity::DATA_BOUNDING_BOX_HEIGHT][1] ?? $data->hitboxHeight;
 				}
 			}
-		} elseif ($packet instanceof AddActorPacket || $packet instanceof AddPlayerPacket) {
+		} elseif (($packet instanceof AddActorPacket || $packet instanceof AddPlayerPacket) && $packet->entityRuntimeId !== $data->entityRuntimeId) {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				$data->locationMap->add($packet->entityRuntimeId, $packet->position, $packet->motion, $packet instanceof AddPlayerPacket);
 			});
-		} elseif ($packet instanceof RemoveActorPacket) {
+		} elseif ($packet instanceof RemoveActorPacket && $packet->entityUniqueId !== $data->entityRuntimeId) {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
 				$data->locationMap->remove($packet->entityUniqueId);
 			});
@@ -445,9 +445,9 @@ final class PacketHandler {
 				while (!$stream->feof()) {
 					$pk = PacketPool::getPacket($stream->getString());
 					$pk->decode();
-					if (($pk instanceof MoveActorAbsolutePacket || $pk instanceof MovePlayerPacket) && $pk->entityRuntimeId !== $data->entityRuntimeId) {
+					if (($pk instanceof MoveActorAbsolutePacket || $pk instanceof MovePlayerPacket)) {
 						$target = $data->locationMap->get($pk->entityRuntimeId);
-						if ($target !== null) {
+						if ($target !== null && $pk->entityRuntimeId !== $data->entityRuntimeId) {
 							if ($pk instanceof MoveActorAbsolutePacket) {
 								$teleport = $pk->flags >= 2;
 							} else {

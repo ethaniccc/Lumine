@@ -103,10 +103,10 @@ abstract class DetectionModule {
 		Server::getInstance()->logger->log("[{$this->data->authData->username} ({$this->data->currentTick}) @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]");
 	}
 
-	protected function buff(float $amount = 1): float {
+	protected function buff(float $amount = 1, float $max = 15): float {
 		$this->buffer += $amount;
 		$this->buffer = max(0, $this->buffer);
-		$this->buffer = min($this->buffer, 8);
+		$this->buffer = min($this->buffer, $max);
 		return $this->buffer;
 	}
 

@@ -58,15 +58,14 @@ final class MathUtils {
         return sqrt($variance);
     }
 
-    public static function getMedian(array $numbers): float {
-        sort($numbers);
-        $count = count($numbers);
-        if ($count % 2 == 0) {
-            return ($numbers[$count / 2 - 1] + $numbers[$count / 2]) / 2;
-        } else {
-            return $numbers[$count / 2];
-        }
-    }
+	public static function getMedian(array $data): float {
+		$count = count($data);
+		if ($count === 0) {
+			return 0.0;
+		}
+		sort($data);
+		return ($count % 2 === 0) ? ($data[$count * 0.5] + $data[$count * 0.5 - 1]) * 0.5 : $data[$count * 0.5];
+	}
 
     public static function getMode(array $numbers): float {
         $counts = array_count_values($numbers);
@@ -126,17 +125,28 @@ final class MathUtils {
         return $standardError * self::getPercentile($numbers, $confidence);
     }
 
-    public static function getOutliers(array $numbers, float $confidence): array {
-        $lower = self::getPercentile($numbers, $confidence / 2);
-        $upper = self::getPercentile($numbers, 1 - $confidence / 2);
-        $outliers = array();
-        foreach ($numbers as $number) {
-            if ($number < $lower || $number > $upper) {
-                $outliers[] = $number;
-            }
-        }
-        return $outliers;
-    }
+	public static function getOutliers(array $collection): float {
+		$count = count($collection);
+		$q1 = self::getMedian(array_splice($collection, 0, (int) ceil($count * 0.5)));
+		$q3 = self::getMedian(array_splice($collection, (int) ceil($count * 0.5), $count));
+
+		$iqr = abs($q1 - $q3);
+		$lowThreshold = $q1 - 1.5 * $iqr;
+		$highThreshold = $q3 + 1.5 * $iqr;
+
+		$x = [];
+		$y = [];
+
+		foreach ($collection as $value) {
+			if ($value < $lowThreshold) {
+				$x[] = $value;
+			} elseif ($value > $highThreshold) {
+				$y[] = $value;
+			}
+		}
+
+		return count($x) + count($y);
+	}
 
     public static function getAverage(array $numbers): float {
         return array_sum($numbers) / count($numbers);
