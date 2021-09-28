@@ -254,7 +254,7 @@ final class PMListener implements Listener {
 				if (in_array($pk->pid(), self::USED_PACKETS, true)) {
 					$pk->decode();
 					if (($pk instanceof MovePlayerPacket || $pk instanceof MoveActorAbsolutePacket)) {
-						if ($pk->entityRuntimeId !== $player->getId()) {
+						if ($pk->entityRuntimeId === $player->getId()) {
 							continue;
 						}
 						if (!isset($this->locationCompensation[$player->getName()])) {
