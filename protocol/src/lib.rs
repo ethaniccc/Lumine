@@ -2,7 +2,7 @@ mod model;
 mod packets;
 #[cfg(test)]
 mod test;
-mod varint;
+pub mod varint;
 use crate::model::{Vec2, Vec3, UUID};
 use crate::varint::{ReadProtocolVarIntExt, WriteProtocolVarIntExt};
 use byteorder::ReadBytesExt;
@@ -34,7 +34,7 @@ impl From<std::io::Error> for DecodeError {
     }
 }
 
-type Result<T = (), E = DecodeError> = std::result::Result<T, E>;
+pub type Result<T = (), E = DecodeError> = std::result::Result<T, E>;
 
 /// Allows the type to be encoded/decoded using mcpe network binary format.
 pub trait CanIo: Sized {
@@ -140,7 +140,7 @@ impl CanIo for UUID {
         Little(self.parts[1]).write(vec);
         Little(self.parts[0]).write(vec);
         Little(self.parts[3]).write(vec);
-        Little(self.parts[2]).write(vec)
+        Little(self.parts[2]).write(vec);
     }
 
     fn read(src: &[u8], _: &mut usize) -> Result<Self> {

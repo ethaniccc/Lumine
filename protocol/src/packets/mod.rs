@@ -99,6 +99,5 @@ can_io! {
         ResourcePackClientResponse = 0x08,
         Text = 0x09,
         SetTime = 0x0a,
-        StartGame = 0x0b,
     }
 }
