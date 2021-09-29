@@ -10,6 +10,6 @@ tokio = { version = '0.2', features = ["full"] }
 serde = "1.0.97"
 serde_derive = "1.0"
 serde_yaml = "0.8.21"
-libflate = "1"
 byteorder = "1.4.3"
 lumine-protocol = {path = "protocol", version = "0.1.0"}
+libflate = "1.1.1"
