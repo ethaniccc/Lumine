@@ -17,6 +17,8 @@ use LumineServer\detections\aimassist\AimAssistA;
 use LumineServer\detections\auth\AuthA;
 use LumineServer\detections\autoclicker\AutoclickerA;
 use LumineServer\detections\autoclicker\AutoclickerB;
+use LumineServer\detections\autoclicker\AutoclickerC;
+use LumineServer\detections\autoclicker\AutoclickerD;
 use LumineServer\detections\badpackets\BadPacketsA;
 use LumineServer\detections\DetectionModule;
 use LumineServer\detections\invalidmovement\InvalidMovementA;
@@ -159,6 +161,8 @@ final class UserData {
 
 			new AutoclickerA($this),
 			new AutoclickerB($this),
+			new AutoclickerC($this),
+			new AutoclickerD($this),
 
 			new AimAssistA($this),
 

@@ -27,7 +27,7 @@ final class AimAssistA extends DetectionModule {
 	private array $aimbotRotationSamples = [];
 
 	public function __construct(UserData $data) {
-		parent::__construct($data, "AimAssist", "A", "Checks the correlation coefficient between expected aimbot rotation values and actual rotation values");
+		parent::__construct($data, "AimAssist", "A", "Checks the correlation coefficient between expected aimbot rotation values and actual rotation values", true);
 	}
 
 	public function run(DataPacket $packet, float $timestamp): void {

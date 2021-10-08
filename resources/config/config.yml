@@ -106,6 +106,12 @@ detections:
       punishment_type: kick
       max_vl: 10
       codename: NDC
+    C:
+      enabled: true
+      punishment_type: kick
+      max_vl: 10
+      codename: LSTD
+
   AimAssist:
     A:
       enabled: false

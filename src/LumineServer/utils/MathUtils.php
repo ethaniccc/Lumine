@@ -107,25 +107,11 @@ final class MathUtils {
         return $sum / count($x);
     }
 
-    public static function getCorrelation(array $x, array $y): float {
-        $xMean = self::getMean($x);
-        $yMean = self::getMean($y);
-        $xStdDev = self::getStandardDeviation($x);
-        $yStdDev = self::getStandardDeviation($y);
-        $covariance = self::getCovariance($x, $y);
-        return $covariance / ($xStdDev * $yStdDev);
-    }
-
     public static function getStandardError(array $numbers): float {
         return self::getStandardDeviation($numbers) / sqrt(count($numbers));
     }
 
-    public static function getConfidenceInterval(array $numbers, float $confidence): float {
-        $standardError = self::getStandardError($numbers);
-        return $standardError * self::getPercentile($numbers, $confidence);
-    }
-
-	public static function getOutliers(array $collection): float {
+	public static function getOutliers(array $collection): int {
 		$count = count($collection);
 		$q1 = self::getMedian(array_splice($collection, 0, (int) ceil($count * 0.5)));
 		$q3 = self::getMedian(array_splice($collection, (int) ceil($count * 0.5), $count));

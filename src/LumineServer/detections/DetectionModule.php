@@ -13,6 +13,7 @@ use LumineServer\webhook\Webhook;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\TextPacket;
+use pocketmine\utils\TextFormat;
 
 abstract class DetectionModule {
 
@@ -61,7 +62,7 @@ abstract class DetectionModule {
 
 	protected function flag(array $debug = [], float $vl = 1): void {
 		$this->violations += $vl;
-		if ($this->violations >= $this->settings->get("max_vl", 20)) {
+		if (!$this->experimental && $this->violations >= $this->settings->get("max_vl", 20)) {
 			switch ($this->settings->get("punishment_type", "none")) {
 				case "kick":
 					$this->kick();
@@ -156,7 +157,7 @@ abstract class DetectionModule {
 		], [
 			Server::getInstance()->getLuminePrefix(),
 			$this->data->authData->username,
-			"{$this->category} ({$this->subCategory})",
+			"{$this->category} ({$this->subCategory})" . ($this->experimental ? TextFormat::RED . " (*Exp)" : ""),
 			$this->settings->get("codename", "???")
 		], Server::getInstance()->settings->get("ban_broadcast"));
 		$this->alert($banBroadcast, AlertNotificationPacket::PUNISHMENT);
