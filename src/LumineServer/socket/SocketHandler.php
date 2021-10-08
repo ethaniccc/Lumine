@@ -14,6 +14,7 @@ use LumineServer\socket\packets\ServerSendDataPacket;
 use LumineServer\socket\packets\UpdateUserPacket;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\UnknownPacket;
+use pocketmine\utils\TextFormat;
 use Socket;
 
 final class SocketHandler {
@@ -178,10 +179,69 @@ final class SocketHandler {
 							$pk->decode();
 							$data->handler->compensate($pk, $packet->timestamp);
 						} elseif ($packet instanceof CommandRequestPacket) {
-							$pk = new CommandResponsePacket();
-							$pk->target = $packet->sender;
-							$pk->response = "Socket server got command {$packet->command} with args: [" . implode(", ", $packet->args) . "]";
-							$this->send($pk, $client->address);
+							switch ($packet->command) {
+								case "logs":
+									$targetPlayer = array_shift($packet->args);
+									if ($targetPlayer === null) {
+										$pk = new CommandResponsePacket();
+										$pk->target = $packet->sender;
+										$pk->response = TextFormat::RED . "You need to specify a player to get the logs of.";
+									} else {
+										/** @var string|null $found */
+										$found = null;
+										$name = strtolower($targetPlayer);
+										$delta = PHP_INT_MAX;
+										foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
+											foreach ($queue as $otherData) {
+												/** @var UserData $otherData */
+												$username = $otherData->authData->username;
+												if(stripos($username, $name) === 0){
+													$curDelta = strlen($username) - strlen($name);
+													if($curDelta < $delta){
+														$found = $username;
+														$delta = $curDelta;
+													}
+													if($curDelta === 0){
+														break;
+													}
+												}
+											}
+										}
+										if ($found === null) {
+											$pk = new CommandResponsePacket();
+											$pk->target = $packet->sender;
+											$pk->response = TextFormat::RED . "$targetPlayer was not found on the socket server";
+										} else {
+											$message = "";
+											$times = 1;
+											foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
+												foreach ($queue as $otherData) {
+													if ($otherData->authData->username === $found) {
+														$message .= TextFormat::GOLD . "Server " . TextFormat::GRAY . "(" . TextFormat::YELLOW . $times . TextFormat::GRAY . "):" . PHP_EOL;
+														$logs = 0;
+														foreach ($otherData->detections as $detection) {
+															if ($detection->violations >= 2) {
+																$message .= TextFormat::AQUA . "(" . TextFormat::LIGHT_PURPLE . var_export(round($detection->violations, 2), true) . TextFormat::AQUA . ") ";
+																$message .= TextFormat::GRAY . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GRAY . ") ";
+																$message .= TextFormat::DARK_GRAY . "- " . TextFormat::GOLD . $detection->description . PHP_EOL;
+																$logs++;
+															}
+														}
+														if ($logs === 0) {
+															$message .= TextFormat::GREEN . "No logs found for {$otherData->authData->username}" . PHP_EOL;
+														}
+														$times++;
+													}
+												}
+											}
+											$pk = new CommandResponsePacket();
+											$pk->target = $packet->sender;
+											$pk->response = $message;
+										}
+									}
+									$this->send($pk, $client->address);
+									break;
+							}
 						}
 					}
 					finish_read:
