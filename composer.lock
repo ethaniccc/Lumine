@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "31bfacda4db53110803b9506e54b2667",
+    "content-hash": "0e70470b2397535d5caeeeefe890dbc2",
     "packages": [
         {
             "name": "adhocore/json-comment",
@@ -365,16 +365,16 @@
         },
         {
             "name": "pocketmine/pocketmine-mp",
-            "version": "3.23.1",
+            "version": "3.25.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/pmmp/PocketMine-MP.git",
-                "reference": "14fba366364eca9f13a30b955c702edbd8e66267"
+                "reference": "f48b703533e0ced4e8ff9e118c5fe3889ccaf23e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pmmp/PocketMine-MP/zipball/14fba366364eca9f13a30b955c702edbd8e66267",
-                "reference": "14fba366364eca9f13a30b955c702edbd8e66267",
+                "url": "https://api.github.com/repos/pmmp/PocketMine-MP/zipball/f48b703533e0ced4e8ff9e118c5fe3889ccaf23e",
+                "reference": "f48b703533e0ced4e8ff9e118c5fe3889ccaf23e",
                 "shasum": ""
             },
             "require": {
@@ -397,7 +397,7 @@
                 "ext-yaml": ">=2.0.0",
                 "ext-zip": "*",
                 "ext-zlib": ">=1.2.11",
-                "php": "^7.4 || ^8.0",
+                "php": "^8.0",
                 "php-64bit": "*",
                 "pocketmine/binaryutils": "^0.1.9",
                 "pocketmine/callback-validator": "^1.0.2",
@@ -411,7 +411,7 @@
                 "pocketmine/spl": "^0.4.0"
             },
             "require-dev": {
-                "phpstan/phpstan": "0.12.98",
+                "phpstan/phpstan": "0.12.99",
                 "phpstan/phpstan-phpunit": "^0.12.6",
                 "phpstan/phpstan-strict-rules": "^0.12.2",
                 "phpunit/phpunit": "^9.2"
@@ -437,7 +437,7 @@
             "homepage": "https://pmmp.io",
             "support": {
                 "issues": "https://github.com/pmmp/PocketMine-MP/issues",
-                "source": "https://github.com/pmmp/PocketMine-MP/tree/3.23.1"
+                "source": "https://github.com/pmmp/PocketMine-MP/tree/3.25.0"
             },
             "funding": [
                 {
@@ -449,7 +449,7 @@
                     "type": "patreon"
                 }
             ],
-            "time": "2021-09-22T00:00:50+00:00"
+            "time": "2021-10-19T17:27:26+00:00"
         },
         {
             "name": "pocketmine/raklib",

@@ -3,7 +3,7 @@
   "description": "A socket server for the Lumine anticheat plugin",
   "type": "project",
   "require": {
-    "pocketmine/pocketmine-mp": "^3.23.1",
+    "pocketmine/pocketmine-mp": "^3.25.0",
     "ext-sockets": "*",
     "ext-pthreads": "*",
     "ext-yaml": "*",

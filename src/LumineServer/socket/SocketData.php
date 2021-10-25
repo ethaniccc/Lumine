@@ -17,8 +17,6 @@ final class SocketData {
     public bool $isAwaitingBuffer = false;
     /** @var string */
     public $recvBuffer = "";
-	/** @var string */
-    public $sndBuffer = "";
 
     public float $lastRetryTime = 0.0;
 
