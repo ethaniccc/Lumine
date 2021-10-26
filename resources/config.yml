@@ -16,6 +16,8 @@
 #  Written by Benjamin <schooldocumentsandstuff@gmail.com> on July, 2021
 
 prefix: "§l§8[§5Lum§dine§8]"
+# Set this option to false if you don't want the server to restart when there's a connection error to the socket
+shutdown_on_connection_error: true
 
 socket_server:
   address: "127.0.0.1"

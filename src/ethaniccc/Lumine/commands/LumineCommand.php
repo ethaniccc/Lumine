@@ -31,7 +31,6 @@ final class LumineCommand extends Command implements PluginIdentifiableCommand {
 						$packet->sender = $sender instanceof Player ? $this->getPlugin()->cache->get($sender) : "CONSOLE";
 						$packet->command = $subCommand;
 						$packet->args = $args;
-						var_dump($packet->args);
 						$this->request($packet, $sender);
 					}
 					break;

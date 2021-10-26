@@ -10,7 +10,6 @@ use ethaniccc\Lumine\events\UnknownEvent;
 use ethaniccc\Lumine\packets\Packet;
 use ethaniccc\Lumine\packets\PacketPool;
 use ethaniccc\Lumine\Settings;
-use LumineServer\Server;
 use pocketmine\network\mcpe\NetworkBinaryStream;
 use pocketmine\Thread;
 use pocketmine\utils\BinaryDataException;

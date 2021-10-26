@@ -19,7 +19,6 @@ use ethaniccc\Lumine\packets\RequestPunishmentPacket;
 use ethaniccc\Lumine\packets\ServerSendDataPacket;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\NetworkStackLatencyPacket;
-use pocketmine\network\mcpe\protocol\TextPacket;
 use pocketmine\scheduler\Task;
 use pocketmine\Server;
 
@@ -56,6 +55,10 @@ final class TickingTask extends Task {
 		}
 		foreach ($keys as $key) {
 			unset(Lumine::getInstance()->listener->locationCompensation[$key]);
+		}
+		if (!Lumine::getInstance()->socketThread->isRunning() && Lumine::getInstance()->getConfig()->get("shutdown_on_connection_error")) {
+			Lumine::getInstance()->getLogger()->error("A connection error to the socket server has been detected - the server will now shutdown.");
+			Server::getInstance()->shutdown();
 		}
 		foreach (Lumine::getInstance()->socketThread->receive() as $packet) {
 			if ($packet instanceof ServerSendDataPacket && $packet->eventType === ServerSendDataPacket::SERVER_SEND_PACKET) {
