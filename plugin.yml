@@ -3,7 +3,7 @@ name: Lumine
 version: 1.0-beta
 main: ethaniccc\Lumine\Lumine
 api: 3.25.0
-protocol: [471]
+mcpe-protocol: [471]
 permissions:
   ac:
     description: The permission that grants full access to Lumine
