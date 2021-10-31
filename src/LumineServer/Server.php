@@ -151,21 +151,27 @@ final class Server {
 		$this->logger->log("Lumine server has started in $time seconds");
 
 		while ($this->running) {
-			++$this->currentTick;
-			$start = microtime(true);
-			$this->socketHandler->tick();
-			$delta = microtime(true) - $start;
-			$this->currentTPS = min(self::TPS, 1 / max(0.0001, $delta));
-			if ($this->performanceLogging) {
-				$cpu = function_exists("sys_getloadavg") ? sys_getloadavg()[0] : "N/A";
-				$memory = round(memory_get_usage() / 1e+6, 4) . "MB";
-				$load = round($delta / (1 / $this->currentTPS), 5) * 100;
-				$this->logger->log("CPU=$cpu% Memory=$memory Load=$load%", false);
-			}
-			if ($delta <= 1 / self::TPS) {
-				$this->tickSleeper->sleepUntil(microtime(true) + (1 / self::TPS) - $delta);
-			} else {
-				$this->logger->log("Server running slower than normal (delta=$delta) - not sleeping to catch up");
+			try {
+				++$this->currentTick;
+				$start = microtime(true);
+				$this->socketHandler->tick();
+				$delta = microtime(true) - $start;
+				$this->currentTPS = min(self::TPS, 1 / max(0.0001, $delta));
+				if ($this->performanceLogging) {
+					$cpu = function_exists("sys_getloadavg") ? sys_getloadavg()[0] : "N/A";
+					$memory = round(memory_get_usage() / 1e+6, 4) . "MB";
+					$load = round($delta / (1 / $this->currentTPS), 5) * 100;
+					$this->logger->log("CPU=$cpu% Memory=$memory Load=$load%", false);
+				}
+				if ($delta <= 1 / self::TPS) {
+					$this->tickSleeper->sleepUntil(microtime(true) + (1 / self::TPS) - $delta);
+				} else {
+					$this->logger->log("Server running slower than normal (delta=$delta) - not sleeping to catch up");
+				}
+			} catch (\Error|\Exception $e) {
+				$this->logger->log("The socket server had an error while ticking - a shutdown will be preformed");
+				$this->logger->log($e->getMessage() . PHP_EOL . $e->getTraceAsString());
+				break;
 			}
 		}
 		echo "Shutting down the Lumine server...\n";
@@ -173,7 +179,7 @@ final class Server {
 		$this->logger->quit();
 		$this->console->quit();
 		$this->webhookThread->quit();
-		exit("Terminated.");
+		exit("Terminated." . PHP_EOL);
 	}
 
 	public function shutdown(): void {
