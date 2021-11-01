@@ -2,19 +2,11 @@
 
 namespace ethaniccc\Lumine\tasks;
 
-use ethaniccc\Lumine\events\AlertNotificationEvent;
-use ethaniccc\Lumine\events\BanUserEvent;
-use ethaniccc\Lumine\events\CommandResponseEvent;
-use ethaniccc\Lumine\events\ConnectionErrorEvent;
-use ethaniccc\Lumine\events\SendErrorEvent;
-use ethaniccc\Lumine\events\ServerSendPacketEvent;
-use ethaniccc\Lumine\events\SocketEvent;
 use ethaniccc\Lumine\Lumine;
 use ethaniccc\Lumine\packets\AlertNotificationPacket;
 use ethaniccc\Lumine\packets\CommandResponsePacket;
 use ethaniccc\Lumine\packets\HeartbeatPacket;
 use ethaniccc\Lumine\packets\LagCompensationPacket;
-use ethaniccc\Lumine\packets\Packet;
 use ethaniccc\Lumine\packets\RequestPunishmentPacket;
 use ethaniccc\Lumine\packets\ServerSendDataPacket;
 use pocketmine\network\mcpe\protocol\BatchPacket;
@@ -58,6 +50,7 @@ final class TickingTask extends Task {
 		}
 		if (!Lumine::getInstance()->socketThread->isRunning() && Lumine::getInstance()->getConfig()->get("shutdown_on_connection_error")) {
 			Lumine::getInstance()->getLogger()->error("A connection error to the socket server has been detected - the server will now shutdown.");
+			Lumine::getInstance()->hasDisconnected = true;
 			Server::getInstance()->shutdown();
 		}
 		foreach (Lumine::getInstance()->socketThread->receive() as $packet) {

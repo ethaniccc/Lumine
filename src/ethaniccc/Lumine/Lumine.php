@@ -7,12 +7,8 @@ namespace ethaniccc\Lumine;
 use ethaniccc\Lumine\commands\LumineCommand;
 use ethaniccc\Lumine\data\DataCache;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
-use ethaniccc\Lumine\events\InitDataEvent;
 use ethaniccc\Lumine\tasks\TickingTask;
 use ethaniccc\Lumine\thread\LumineSocketThread;
-use pocketmine\network\mcpe\convert\ItemTranslator;
-use pocketmine\network\mcpe\convert\ItemTypeDictionary;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\protocol\PacketPool;
 use pocketmine\plugin\PluginBase;
 
@@ -25,6 +21,7 @@ class Lumine extends PluginBase {
 	public PMListener $listener;
 	public TickingTask $task;
 	public DataCache $cache;
+	public bool $hasDisconnected = false;
 
 	/** @var int[] */
 	public array $alertCooldowns = [];
@@ -54,6 +51,12 @@ class Lumine extends PluginBase {
 		$this->getScheduler()->scheduleRepeatingTask($this->task, 1);
 		$this->cache = new DataCache();
 		$this->getServer()->getCommandMap()->register($this->getName(), new LumineCommand());
+	}
+
+	public function onDisable() {
+		if ($this->hasDisconnected) {
+			file_put_contents($this->getDataFolder() . "reconnect", microtime(true) + 1);
+		}
 	}
 
 }

@@ -46,6 +46,13 @@ final class LumineSocketThread extends Thread {
 			"address" => "127.0.0.1",
 			"port" => 3001
 		]));
+		if (file_exists("plugin_data/Lumine/reconnect")) {
+			$time = (float) file_get_contents("plugin_data/Lumine/reconnect");
+			while (microtime(true) - $time <= 3) {
+				usleep(1000);
+			}
+			unlink("plugin_data/Lumine/reconnect");
+		}
 		$sendSocket = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
 		if (!@socket_connect($sendSocket, $serverSettings->get("address", "127.0.0.1"), $serverSettings->get("port", 3001))) {
 			$this->logger->error("Unable to establish initial connection to socket server - make sure it's running");
