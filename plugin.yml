@@ -19,6 +19,9 @@ permissions:
           ac.command.cooldown:
             description: The permission that grants alert cooldown command access in Lumine
             default: op
+          ac.command.debug:
+            description: The p[ermissions that grants debug command access in Lumine
+            default: op
       ac.notifications:
         description: The permission that grants the ability to view Lumine notifcations
         default: op

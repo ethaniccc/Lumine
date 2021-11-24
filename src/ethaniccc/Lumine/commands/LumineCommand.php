@@ -24,6 +24,7 @@ final class LumineCommand extends Command implements PluginIdentifiableCommand {
 			$subCommand = array_shift($args);
 			switch ($subCommand) {
 				case "logs":
+				case "debug":
 					if (!$sender->hasPermission("ac.command.$subCommand")) {
 						$this->deny($sender);
 					} else {

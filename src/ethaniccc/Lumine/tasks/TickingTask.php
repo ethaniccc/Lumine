@@ -66,7 +66,7 @@ final class TickingTask extends Task {
 				foreach (Server::getInstance()->getOnlinePlayers() as $player) {
 					if ($player->hasPermission("ac.notifications")) {
 						if ($packet->type !== AlertNotificationPacket::PUNISHMENT) {
-							$diff = microtime(true) - Lumine::getInstance()->lastAlertTimes[$player->getName()];
+							$diff = microtime(true) - (Lumine::getInstance()->lastAlertTimes[$player->getName()] ?? 0);
 							$cooldown = Lumine::getInstance()->alertCooldowns[$player->getName()];
 							if ($diff >= $cooldown) {
 								Lumine::getInstance()->lastAlertTimes[$player->getName()] = microtime(true);
