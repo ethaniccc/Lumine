@@ -11,16 +11,13 @@ done
 
 ./bin/php7/bin/php src/LumineServer/index.php
 
-LOOPS=0
-
 set +e
 
 if [ "$DO_LOOP" == "yes" ]; then
 	while true; do
-		echo "To escape the loop, press CTRL+C now. Otherwise, wait 1 second for the server to restart."
+		#echo "To escape the loop, press CTRL+C now. Otherwise, wait 1 second for the server to restart."
 		echo ""
-		sleep 1
-		((LOOPS++))
+		#sleep 1
 		./bin/php7/bin/php src/LumineServer/index.php
 	done
 fi

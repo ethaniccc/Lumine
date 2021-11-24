@@ -6,6 +6,7 @@ use DateTime;
 use LumineServer\data\auth\AuthData;
 use LumineServer\data\click\ClickData;
 use LumineServer\data\effect\EffectData;
+use LumineServer\data\handler\DebugHandler;
 use LumineServer\data\handler\GhostBlockHandler;
 use LumineServer\data\handler\MovementPredictionHandler;
 use LumineServer\data\handler\NetworkStackLatencyManager;
@@ -25,11 +26,11 @@ use LumineServer\detections\invalidmovement\InvalidMovementA;
 use LumineServer\detections\invalidmovement\InvalidMovementB;
 use LumineServer\detections\invalidmovement\InvalidMovementC;
 use LumineServer\detections\killaura\KillauraA;
+use LumineServer\detections\killaura\KillauraB;
 use LumineServer\detections\range\RangeA;
 use LumineServer\detections\timer\TimerA;
 use LumineServer\detections\velocity\VelocityA;
 use LumineServer\detections\velocity\VelocityB;
-use LumineServer\events\BanUserEvent;
 use LumineServer\Server;
 use LumineServer\socket\packets\RequestPunishmentPacket;
 use LumineServer\utils\AABB;
@@ -122,15 +123,12 @@ final class UserData {
 	public ?NetworkStackLatencyManager $latencyManager;
 	public ?GhostBlockHandler $ghostBlockHandler;
 	public ?MovementPredictionHandler $movementPredictionHandler;
+	public ?DebugHandler $debugHandler;
 
 	public function __construct(
 		public string $identifier,
 		public string $socketAddress
 	) {
-		$this->handler = new PacketHandler($this);
-		$this->latencyManager = new NetworkStackLatencyManager($this);
-		$this->ghostBlockHandler = new GhostBlockHandler($this);
-		$this->movementPredictionHandler = new MovementPredictionHandler($this);
 		$this->clickData = new ClickData();
 		$this->world = new VirtualWorld();
 
@@ -158,6 +156,7 @@ final class UserData {
 			new RangeA($this),
 
 			new KillauraA($this),
+			new KillauraB($this),
 
 			new AutoclickerA($this),
 			new AutoclickerB($this),
@@ -172,6 +171,12 @@ final class UserData {
 
 			new BadPacketsA($this),
 		];
+
+		$this->handler = new PacketHandler($this);
+		$this->latencyManager = new NetworkStackLatencyManager($this);
+		$this->ghostBlockHandler = new GhostBlockHandler($this);
+		$this->movementPredictionHandler = new MovementPredictionHandler($this);
+		$this->debugHandler = new DebugHandler($this);
 
 		$this->sendQueue = new BatchPacket();
 		$this->sendQueue->setCompressionLevel(7);
@@ -239,6 +244,9 @@ final class UserData {
 		$this->ghostBlockHandler = null;
 		$this->movementPredictionHandler->destroy();
 		$this->movementPredictionHandler = null;
+		$this->debugHandler->destroy();
+		$this->debugHandler = null;
+
 		$this->world->destroy();
 		$this->world = null;
 		$this->clickData = null;

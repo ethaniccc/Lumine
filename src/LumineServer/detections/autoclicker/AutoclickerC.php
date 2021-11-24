@@ -22,6 +22,7 @@ class AutoclickerC extends DetectionModule {
 			if (count($this->samples) === 20) {
 				$deviation = MathUtils::getStandardDeviation($this->samples);
 				$skewness = MathUtils::getSkewness($this->samples);
+				$this->debug("dev=$deviation skew=$skewness cps={$data->clickData->cps}");
 				if ($deviation <= 20 && ($skewness > 1 || $skewness === 0.0) && $data->clickData->cps >= 9) {
 					if ($this->buff() >= ($skewness === 0.0 ? 1 : 5)) {
 						$this->flag([

@@ -19,10 +19,13 @@ class AutoclickerB extends DetectionModule {
 		if ($data->clickData->isClicking) {
 			$this->samples[] = $data->clickData->delay;
 			if (count($this->samples) === 20) {
+				$this->debug("samples=" . implode(",", $this->samples));
 				if (!in_array(0, $this->samples, true) && $data->clickData->cps >= 16) {
 					$this->flag([
 						"cps" => $data->clickData->cps
 					]);
+				} else {
+					$this->buff(-0.025);
 				}
 				$this->samples = [];
 			}

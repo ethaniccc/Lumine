@@ -23,6 +23,7 @@ final class InvalidMovementB extends DetectionModule {
         if ($packet instanceof PlayerAuthInputPacket) {
             $diff = abs($data->motion->y - $data->previousServerPredictedMotion->y);
 			$lastDiff = abs($data->motion->y - $this->lastPrediction->y);
+			$this->debug("diff=$diff lastDiff=$lastDiff");
             if ($diff > 0.01 && $lastDiff > 0.01 && !$data->isTeleporting && $data->ticksSinceInCobweb >= 10 && $data->ticksSinceInLiquid >= 10) {
                 if ($this->buff() >= 10) {
                     $this->flag([

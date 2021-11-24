@@ -30,6 +30,7 @@ final class TimerA extends DetectionModule {
 			$diff = $timestamp - $this->lastTimestamp;
 			$this->balance += 0.05;
 			$this->balance -= $diff;
+			$this->debug("balance={$this->balance}");
 			if ($this->balance >= 0.25) {
 				$this->flag([
 					"balance" => round($this->balance, 3)

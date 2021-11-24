@@ -12,10 +12,13 @@ namespace LumineServer {
 		});
 		date_default_timezone_set('America/New_York');
 		$server = new Server();
-		$server->run();
+		try {
+			$server->run();
+		} catch (\Exception $e) {
+			exit();
+		}
 	}
 
-	ignore_user_abort(true);
 	\LumineServer\server();
 
 }

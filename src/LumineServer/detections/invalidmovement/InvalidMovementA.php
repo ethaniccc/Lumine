@@ -26,6 +26,7 @@ final class InvalidMovementA extends DetectionModule {
 			if ($data->isCollidedHorizontally) {
 				$max = 0.25;
 			}
+			$this->debug("xDiff={$diffVec->x} zDiff={$diffVec->z} max=$max");
 			if (($diffVec->x > $max || $diffVec->z > $max) && ($lastDiffVec->x > $max || $lastDiffVec->z > $max) && !$data->isTeleporting && $data->ticksSinceInLiquid >= 10
 			&& $data->ticksSinceInCobweb >= 10) {
 				if ($this->buff() >= 10) {

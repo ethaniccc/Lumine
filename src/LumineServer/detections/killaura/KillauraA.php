@@ -27,6 +27,7 @@ final class KillauraA extends DetectionModule {
             $this->lastSwingTick = $data->currentTick;
         } elseif ($packet instanceof InventoryTransactionPacket && $packet->trData instanceof UseItemOnEntityTransactionData && $packet->trData->getActionType() === UseItemOnEntityTransactionData::ACTION_ATTACK) {
             $tickDiff = $data->currentTick - $this->lastSwingTick;
+			$this->debug("tickDiff=$tickDiff");
             if ($tickDiff > $this->settings->get("diff", 4)) {
                 $this->flag(["tDSS" => $tickDiff]);
             }

@@ -20,6 +20,7 @@ final class VelocityB extends DetectionModule {
 			$zPct = ($data->motion->z / $data->previousServerPredictedMotion->z) * 100;
 			$min = $this->settings->get("min_pct", 99.99);
 			$max = $this->settings->get("max_pct", 150);
+			$this->debug("xPct=$xPct% zPct=$zPct% min=$min max=$max");
 			if (($xPct < $min && $zPct < $min) || ($xPct > $max && $zPct > $max) && !$data->isTeleporting) {
 				if ($this->buff() >= 4) {
 					$this->flag([

@@ -24,6 +24,7 @@ class AutoclickerD extends DetectionModule {
 				$skewness = MathUtils::getSkewness($this->samples);
 				$outliers = MathUtils::getOutliers($this->samples);
 				$deviation = MathUtils::getStandardDeviation($this->samples);
+				$this->debug("kurt=$kurtosis skew=$skewness o=$outliers dev=$deviation cps={$data->clickData->cps}");
 				if ($kurtosis <= 0.05 && $skewness < 0 && $outliers === 0 && $deviation <= 25 && $data->clickData->cps >= 9) {
 					if ($this->buff(1, 2) > 1) {
 						$this->flag([

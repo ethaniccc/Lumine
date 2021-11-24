@@ -33,6 +33,7 @@ class InvalidMovementC extends DetectionModule {
 				}
 				$this->jumpTicks = 10;
 			}
+			$this->debug("jumpTicks={$this->jumpTicks} isHoldingJump=" . var_export($isHoldingJump, true));
 		}
 	}
 

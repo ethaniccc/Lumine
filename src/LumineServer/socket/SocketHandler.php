@@ -187,56 +187,78 @@ final class SocketHandler {
 										$pk->target = $packet->sender;
 										$pk->response = TextFormat::RED . "You need to specify a player to get the logs of.";
 									} else {
-										/** @var string|null $found */
-										$found = null;
-										$name = strtolower($targetPlayer);
-										$delta = PHP_INT_MAX;
-										foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
-											foreach ($queue as $otherData) {
-												/** @var UserData $otherData */
-												$username = $otherData->authData->username;
-												if(stripos($username, $name) === 0){
-													$curDelta = strlen($username) - strlen($name);
-													if($curDelta < $delta){
-														$found = $username;
-														$delta = $curDelta;
-													}
-													if($curDelta === 0){
-														break;
-													}
-												}
-											}
-										}
-										if ($found === null) {
+										$dataList = Server::getInstance()->dataStorage->find($targetPlayer);
+										if (count($dataList) === 0) {
 											$pk = new CommandResponsePacket();
 											$pk->target = $packet->sender;
 											$pk->response = TextFormat::RED . "$targetPlayer was not found on the socket server";
 										} else {
 											$message = "";
 											$times = 1;
-											foreach (Server::getInstance()->dataStorage->getAll() as $queue) {
-												foreach ($queue as $otherData) {
-													if ($otherData->authData->username === $found) {
-														$message .= TextFormat::GOLD . "Server " . TextFormat::GRAY . "(" . TextFormat::YELLOW . $times . TextFormat::GRAY . "):" . PHP_EOL;
-														$logs = 0;
-														foreach ($otherData->detections as $detection) {
-															if ($detection->violations >= 2) {
-																$message .= TextFormat::AQUA . "(" . TextFormat::LIGHT_PURPLE . var_export(round($detection->violations, 2), true) . TextFormat::AQUA . ") ";
-																$message .= TextFormat::GRAY . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GRAY . ") ";
-																$message .= TextFormat::DARK_GRAY . "- " . TextFormat::GOLD . $detection->description . PHP_EOL;
-																$logs++;
-															}
-														}
-														if ($logs === 0) {
-															$message .= TextFormat::GREEN . "No logs found for {$otherData->authData->username}" . PHP_EOL;
-														}
-														$times++;
+											foreach ($dataList as $otherData) {
+												$message .= TextFormat::UNDERLINE . TextFormat::GOLD . "Server no." . TextFormat::YELLOW . $times . TextFormat::RESET . PHP_EOL;
+												$logs = 0;
+												foreach ($otherData->detections as $detection) {
+													if ($detection->violations >= 2) {
+														$message .= TextFormat::AQUA . "(" . TextFormat::LIGHT_PURPLE . var_export(round($detection->violations, 2), true) . TextFormat::AQUA . ") ";
+														$message .= TextFormat::GRAY . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GRAY . ") ";
+														$message .= TextFormat::DARK_GRAY . "- " . TextFormat::GOLD . $detection->description . PHP_EOL;
+														$logs++;
 													}
 												}
+												if ($logs === 0) {
+													$message .= TextFormat::GREEN . "No logs found for {$otherData->authData->username}" . PHP_EOL;
+												}
+												$times++;
 											}
 											$pk = new CommandResponsePacket();
 											$pk->target = $packet->sender;
 											$pk->response = $message;
+										}
+									}
+									$this->send($pk, $client->address);
+									break;
+								case "debug":
+									$targetW = array_shift($packet->args);
+									$pk = new CommandResponsePacket();
+									$pk->target = $packet->sender;
+									if ($targetW === null) {
+										$pk->response = TextFormat::RED . "You need to specify a target player.";
+									} else {
+										$target = Server::getInstance()->dataStorage->find($targetW)[0] ?? null;
+										if ($target === null) {
+											$pk->response = TextFormat::RED . "$targetW was not found in any server connected to Lumine.";
+										} else {
+											$action = array_shift($packet->args);
+											if ($action === null) {
+												$pk->response = TextFormat::RED . "You must specify if you want to subscribe or unsubscribe to a channel.";
+											} else {
+												$action = strtolower($action);
+												$wantedChannel = array_shift($packet->args);
+												if ($wantedChannel === null) {
+													$pk->response = TextFormat::RED . "You need to specify a debug channel.";
+												} else {
+													$channel = $target->debugHandler->getChannel($wantedChannel);
+													if ($channel === null) {
+														$pk->response = TextFormat::RED . "$wantedChannel is not a valid debug channel.";
+													} else {
+														$sub = Server::getInstance()->dataStorage->get($packet->sender, $client->address);
+														if ($packet->sender === "CONSOLE") {
+															$pk->response = TextFormat::RED . "You cannot run this command from the console.";
+														} elseif ($sub === null) {
+															$pk->response = TextFormat::DARK_RED . "CRITICAL ERROR - You were not found.";
+														} elseif ($action === "subscribe" || $action === "sub") {
+															$channel->subscribe($sub);
+															$pk->response = TextFormat::GREEN . "You have been subscribed to the debug channel!";
+														} elseif ($action === "unsubscribe" || $action === "unsub") {
+															$channel->unsubscribe($sub);
+															$pk->response = TextFormat::GREEN . "You have been unsubscribed from the debug channel!";
+														} else {
+															$pk->response = TextFormat::RED . "Invalid action.";
+														}
+													}
+												}
+											}
 										}
 									}
 									$this->send($pk, $client->address);

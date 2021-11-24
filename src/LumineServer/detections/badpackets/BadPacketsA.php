@@ -19,6 +19,7 @@ final class BadPacketsA extends DetectionModule {
         $data = $this->data;
         if ($packet instanceof MovePlayerPacket) {
             $diff = $data->currentTick - $this->lastTick;
+			$this->debug("diff=$diff");
             if ($diff < 2) {
                 $this->flag([
                     "diff" => $diff

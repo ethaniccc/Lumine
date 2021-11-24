@@ -94,6 +94,11 @@ detections:
       punishment_type: kick
       max_vl: 10
       codename: NSK
+    B:
+      enabled: true
+      punishment_type: kick
+      max_vl: 20
+      codename: EHO
   Autoclicker:
     A:
       enabled: true

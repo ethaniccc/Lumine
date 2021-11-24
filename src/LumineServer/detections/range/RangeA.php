@@ -25,6 +25,7 @@ final class RangeA extends DetectionModule {
 					$AABB = AABB::fromPosition($target->lastPos, $target->hitboxWidth, $target->hitboxHeight);
 					$attackPos = $trData->getPlayerPos()->subtract(0, 1.62)->add(0, $data->isSneaking ? 1.54 : 1.62);
 					$distance = $AABB->distanceFromVector($attackPos);
+					$this->debug("dist=$distance");
 					if ($distance > $this->settings->get("max_dist", 3.1)) {
 						if ($this->buff() >= 5) {
 							$this->flag([

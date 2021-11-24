@@ -16,6 +16,7 @@ final class AutoclickerA extends DetectionModule {
 		$data = $this->data;
 		if ($data->clickData->isClicking) {
 			$cps = $data->clickData->cps;
+			$this->debug("cps=$cps");
 			if ($cps >= $this->settings->get("max_cps", 23)) {
 				$this->flag([
 					"cps" => $cps

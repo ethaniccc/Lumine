@@ -60,6 +60,10 @@ abstract class DetectionModule {
 		}
 	}
 
+	protected function debug(string $message): void {
+		$this->data->debugHandler->getChannel($this->category . $this->subCategory)->broadcast(Server::getInstance()->getLuminePrefix() . TextFormat::GRAY . "(" . TextFormat::BOLD . TextFormat::RED . "DEBUG" . TextFormat::RESET . TextFormat::GRAY . ") " . TextFormat::RESET . $message);
+	}
+
 	protected function flag(array $debug = [], float $vl = 1): void {
 		$this->violations += $vl;
 		if (!$this->experimental && $this->violations >= $this->settings->get("max_vl", 20)) {

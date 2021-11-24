@@ -28,6 +28,7 @@ final class VelocityA extends DetectionModule {
 				$expected = $data->previousServerPredictedMotion->y;
 				$movement = $data->motion->y;
 				$percentage = ($movement / $expected) * 100;
+				$this->debug("pct=$percentage%");
 				if ($percentage < $this->settings->get("min_pct", 99.99) || $percentage > $this->settings->get("max_pct", 110)) {
 					if ($this->buff() >= 4) {
 						$this->flag([

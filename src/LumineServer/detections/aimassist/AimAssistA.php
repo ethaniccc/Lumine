@@ -62,6 +62,7 @@ final class AimAssistA extends DetectionModule {
 					// we multiply the correlation coefficient with 100 to make it into a percentage
 					// this makes configuration easier for the user using Lumine.
 					$cC = MathUtils::getCorrelationCoefficient($this->actualRotationSamples, $this->aimbotRotationSamples) * 100;
+					$this->debug("correlation=$cC%");
 					if ($cC > $this->settings->get("correlation", 99.0)) { // TODO: Test and experiment with this threshold
 						$this->flag([
 							"correlation" => var_export(round($cC, 2), true) . "%"

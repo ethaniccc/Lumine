@@ -22,28 +22,19 @@ final class AuthA extends DetectionModule {
 			if ($data->authData->titleID === "UNKNOWN") {
 				return;
 			}
-			switch ($data->authData->titleID) {
-				case "896928775":
-					$expectedOS = DeviceOS::WINDOWS_10;
-					break;
-				case "2047319603":
-					$expectedOS = DeviceOS::NINTENDO;
-					break;
-				case "1739947436":
-					$expectedOS = DeviceOS::ANDROID;
-					break;
-				case "2044456598":
-					$expectedOS = DeviceOS::PLAYSTATION;
-					break;
-				case "1828326430":
-					$expectedOS = DeviceOS::XBOX;
-					break;
-				case "1810924247":
-					$expectedOS = DeviceOS::IOS;
-					break;
-				default:
-					Server::getInstance()->logger->log("Unknown TitleID from " . TextFormat::clean($packet->username) . " (titleID={$data->authData->titleID} os={$data->playerOS})");
-					return;
+			// match the title ID and return the expected device os
+			$expectedOS = match ($data->authData->titleID) {
+				"896928775" => DeviceOS::WINDOWS_10,
+				"2047319603" => DeviceOS::NINTENDO,
+				"1739947436" => DeviceOS::ANDROID,
+				"2044456598" => DeviceOS::PLAYSTATION,
+				"1828326430" => DeviceOS::XBOX,
+				"1810924247" => DeviceOS::IOS,
+				default => null
+			};
+			if ($expectedOS === null) {
+				Server::getInstance()->logger->log(TextFormat::RED . "({$data->authData->username}) Unknown title ID: " . $data->authData->titleID . " Player OS: " . $data->playerOS);
+				return;
 			}
 			Server::getInstance()->logger->log("{$data->authData->username} @ AuthA: expected=$expectedOS got={$data->playerOS} titleID={$data->authData->titleID}");
 			if ($data->playerOS !== $expectedOS) {
