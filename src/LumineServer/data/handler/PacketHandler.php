@@ -4,6 +4,7 @@ namespace LumineServer\data\handler;
 
 use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
+use LumineServer\data\attack\AttackData;
 use LumineServer\data\auth\AuthData;
 use LumineServer\data\effect\EffectData;
 use LumineServer\data\effect\ExtraEffectIds;
@@ -239,7 +240,7 @@ final class PacketHandler {
 				}
 			} elseif ($trData instanceof UseItemOnEntityTransactionData) {
 				$data->clickData->add($data->currentTick);
-				$data->attackPos = $trData->getPlayerPos();
+				$data->attackData = new AttackData($trData->getEntityRuntimeId(), $trData->getPlayerPos()->subtract(0, 1.62));
 			}
 		} elseif ($packet instanceof LoginPacket) {
 			$d = $packet->chainData;

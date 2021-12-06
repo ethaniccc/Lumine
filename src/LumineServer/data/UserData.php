@@ -3,6 +3,7 @@
 namespace LumineServer\data;
 
 use DateTime;
+use LumineServer\data\attack\AttackData;
 use LumineServer\data\auth\AuthData;
 use LumineServer\data\click\ClickData;
 use LumineServer\data\effect\EffectData;
@@ -61,7 +62,7 @@ final class UserData {
 	public Vector3 $previousServerPredictedMotion;
 	public Vector3 $serverSentMotion;
 	public Vector3 $lastOnGroundLocation;
-	public ?Vector3 $attackPos = null;
+	public ?AttackData $attackData = null;
 
 	public int $ticksSinceMotion = 0;
 	public int $ticksOnGround = 0;
