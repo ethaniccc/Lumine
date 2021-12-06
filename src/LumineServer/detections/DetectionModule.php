@@ -3,24 +3,20 @@
 namespace LumineServer\detections;
 
 use LumineServer\data\UserData;
-use LumineServer\events\AlertNotificationEvent;
-use LumineServer\Server;
 use LumineServer\Settings;
 use LumineServer\socket\packets\AlertNotificationPacket;
-use LumineServer\webhook\Message;
-use LumineServer\webhook\Embed;
-use LumineServer\webhook\Webhook;
-use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
-use pocketmine\network\mcpe\protocol\TextPacket;
 use pocketmine\utils\TextFormat;
+use function LumineServer\subprocess\getPrefix;
+use function LumineServer\subprocess\getSettings;
+use function LumineServer\subprocess\sendPacketToSocket;
 
 abstract class DetectionModule {
 
 	public static Settings $globalSettings;
 
 	public static function init(): void {
-		self::$globalSettings = Server::getInstance()->settings->get("detections", new Settings([
+		self::$globalSettings = getSettings()->get("detections", new Settings([
 		]));
 	}
 
@@ -51,7 +47,6 @@ abstract class DetectionModule {
 		if (!$categorySettings instanceof Settings) {
 			$this->enabled = true;
 			$this->settings = new Settings([]);
-			Server::getInstance()->logger->log("Settings were not found for the {$this->category} detections", false);
 		} else {
 			unset($this->settings);
 			$this->settings = $categorySettings->get($this->subCategory, new Settings([
@@ -61,7 +56,7 @@ abstract class DetectionModule {
 	}
 
 	protected function debug(string $message): void {
-		$this->data->debugHandler->getChannel($this->category . $this->subCategory)->broadcast(Server::getInstance()->getLuminePrefix() . TextFormat::GRAY . "(" . TextFormat::BOLD . TextFormat::RED . "DEBUG" . TextFormat::RESET . TextFormat::GRAY . ") " . TextFormat::RESET . $message);
+		$this->data->debugHandler->getChannel($this->category . $this->subCategory)->broadcast(getPrefix() . TextFormat::GRAY . "(" . TextFormat::BOLD . TextFormat::RED . "DEBUG" . TextFormat::RESET . TextFormat::GRAY . ") " . TextFormat::RESET . $message);
 	}
 
 	protected function flag(array $debug = [], float $vl = 1): void {
@@ -97,15 +92,15 @@ abstract class DetectionModule {
 			"{violations}",
 			"{debug}"
 		], [
-			Server::getInstance()->getLuminePrefix(),
+			getPrefix(),
 			$this->data->authData->username,
 			"{$this->category} ({$this->subCategory})",
 			var_export(round($this->violations, 2), true),
 			$debugString
-		], Server::getInstance()->settings->get("alert_message", "{prefix} §e{name} §7failed §e{detection} §7(§cx{violations}§7) §7{debug}"));
+		], getSettings()->get("alert_message", "{prefix} §e{name} §7failed §e{detection} §7(§cx{violations}§7) §7{debug}"));
 		$this->alert($violationMessage, AlertNotificationPacket::VIOLATION);
 		$this->sendDiscordAlert($this->data->authData->username, $debugString);
-		Server::getInstance()->logger->log("[{$this->data->authData->username} ({$this->data->currentTick}) @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]");
+		echo("[{$this->data->authData->username} ({$this->data->currentTick}) @ {$this->data->socketAddress}] - Flagged {$this->category} ({$this->subCategory}) (x" . var_export((float) round($this->violations, 2), true) . ") [$debugString]" . PHP_EOL);
 	}
 
 	protected function buff(float $amount = 1, float $max = 15): float {
@@ -120,9 +115,9 @@ abstract class DetectionModule {
 			"{prefix}",
 			"{codename}"
 		], [
-			Server::getInstance()->getLuminePrefix(),
+			getPrefix(),
 			$this->settings->get("codename", "???")
-		], Server::getInstance()->settings->get("kick_message"));
+		], getSettings()->get("kick_message"));
 		$this->data->kick($kickMessage);
 		$kickBroadcast = str_replace([
 			"{prefix}",
@@ -130,25 +125,25 @@ abstract class DetectionModule {
 			"{detection}",
 			"{codename}"
 		], [
-			Server::getInstance()->getLuminePrefix(),
+			getPrefix(),
 			$this->data->authData->username,
 			"{$this->category} ({$this->subCategory})",
 			$this->settings->get("codename", "???")
-		], Server::getInstance()->settings->get("kick_broadcast"));
+		], getSettings()->get("kick_broadcast"));
 		$this->alert($kickBroadcast, AlertNotificationPacket::VIOLATION);
 	}
 
 	protected function ban(): void {
-		$expiration = (new \DateTime("now"))->modify(Server::getInstance()->settings->get("ban_expiration", "7 days"));
+		$expiration = (new \DateTime("now"))->modify(getSettings()->get("ban_expiration", "7 days"));
 		$banMessage = str_replace([
 			"{prefix}",
 			"{codename}",
 			"{expiration}"
 		], [
-			Server::getInstance()->getLuminePrefix(),
+			getPrefix(),
 			$this->settings->get("codename", "???"),
 			($expiration === false ? "never" : $expiration->format("m/d/y H:i A T"))
-		], Server::getInstance()->settings->get("ban_message"));
+		], getSettings()->get("ban_message"));
 		if ($expiration === false) {
 			$expiration = null;
 		}
@@ -159,11 +154,11 @@ abstract class DetectionModule {
 			"{detection}",
 			"{codename}"
 		], [
-			Server::getInstance()->getLuminePrefix(),
+			getPrefix(),
 			$this->data->authData->username,
 			"{$this->category} ({$this->subCategory})" . ($this->experimental ? TextFormat::RED . " (*Exp)" : ""),
 			$this->settings->get("codename", "???")
-		], Server::getInstance()->settings->get("ban_broadcast"));
+		], getSettings()->get("ban_broadcast"));
 		$this->alert($banBroadcast, AlertNotificationPacket::PUNISHMENT);
 	}
 
@@ -176,11 +171,12 @@ abstract class DetectionModule {
 		$packet = new AlertNotificationPacket();
 		$packet->type = $type;
 		$packet->message = $broadcast;
-		Server::getInstance()->socketHandler->send($packet, $this->data->socketAddress);
+		sendPacketToSocket($packet);
 	}
 
 	protected function sendDiscordAlert(string $player, string $debug): void {
-		$webhookSettings = Server::getInstance()->settings->get("webhook");
+		// TODO: Bring this back after finishing with subprocesses
+		/* $webhookSettings = Server::getInstance()->settings->get("webhook");
 		$webhookLink = $webhookSettings->get("link");
 
 		if ($webhookLink === null || $webhookLink === "none" || $webhookSettings->get("alerts") === false) {
@@ -204,7 +200,7 @@ abstract class DetectionModule {
 		$msg->addEmbed($embed);
 
 		$webhook = new Webhook($webhookLink, $msg);
-		Server::getInstance()->webhookThread->queue($webhook);
+		Server::getInstance()->webhookThread->queue($webhook); */
 	}
 
 }

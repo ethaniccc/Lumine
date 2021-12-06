@@ -21,19 +21,7 @@ final class SubChunkOverride extends SubChunk {
 	public function __construct(string $ids = "", string $data = "", string $skyLight = "", string $blockLight = "") {
 		$this->ids = zlib_encode(self::assignData($ids, 4096), ZLIB_ENCODING_RAW, 7);
 		$this->data = zlib_encode(self::assignData($data, 2048), ZLIB_ENCODING_RAW, 7);
-		$this->skyLight = zlib_encode(self::assignData($skyLight, 2048, "\xff"), ZLIB_ENCODING_RAW, 7);
-		$this->blockLight = zlib_encode(self::assignData($blockLight, 2048), ZLIB_ENCODING_RAW, 7);
 		$this->collectGarbage();
-	}
-
-	public function isEmpty(bool $checkLight = true) : bool{
-		return (
-			substr_count(zlib_decode($this->ids), "\x00") === 4096 and
-			(!$checkLight or (
-					substr_count(zlib_decode($this->skyLight), "\xff") === 2048 and
-					zlib_decode($this->blockLight) === ZERO_NIBBLE_ARRAY
-				))
-		);
 	}
 
 	public function getBlockId(int $x, int $y, int $z) : int{
@@ -95,36 +83,6 @@ final class SubChunkOverride extends SubChunk {
 		return $changed;
 	}
 
-	public function getBlockLight(int $x, int $y, int $z) : int{
-		return (ord(zlib_decode($this->blockLight)[($x << 7) | ($z << 3) | ($y >> 1)]) >> (($y & 1) << 2)) & 0xf;
-	}
-
-	public function setBlockLight(int $x, int $y, int $z, int $level) : bool{
-		$i = ($x << 7) | ($z << 3) | ($y >> 1);
-		$blockLight = zlib_decode($this->blockLight);
-		$shift = ($y & 1) << 2;
-		$byte = ord($blockLight[$i]);
-		$blockLight[$i] = chr(($byte & ~(0xf << $shift)) | (($level & 0xf) << $shift));
-		$this->blockLight = zlib_encode($blockLight, ZLIB_ENCODING_RAW, 7);
-
-		return true;
-	}
-
-	public function getBlockSkyLight(int $x, int $y, int $z) : int{
-		return (ord(zlib_decode($this->skyLight)[($x << 7) | ($z << 3) | ($y >> 1)]) >> (($y & 1) << 2)) & 0xf;
-	}
-
-	public function setBlockSkyLight(int $x, int $y, int $z, int $level) : bool{
-		$i = ($x << 7) | ($z << 3) | ($y >> 1);
-		$skyLight = zlib_decode($this->skyLight);
-		$shift = ($y & 1) << 2;
-		$byte = ord($skyLight[$i]);
-		$skyLight[$i] = chr(($byte & ~(0xf << $shift)) | (($level & 0xf) << $shift));
-		$this->skyLight = zlib_encode($skyLight, ZLIB_ENCODING_RAW, 7);
-
-		return true;
-	}
-
 	public function getHighestBlockAt(int $x, int $z) : int{
 		$low = ($x << 8) | ($z << 4);
 		$i = $low | 0x0f;
@@ -145,10 +103,6 @@ final class SubChunkOverride extends SubChunk {
 		return substr(zlib_decode($this->data), ($x << 7) | ($z << 3), 8);
 	}
 
-	public function getBlockLightColumn(int $x, int $z) : string{
-		return substr(zlib_decode($this->blockLight), ($x << 7) | ($z << 3), 8);
-	}
-
 	public function getBlockSkyLightColumn(int $x, int $z) : string{
 		return substr(zlib_decode($this->skyLight), ($x << 7) | ($z << 3), 8);
 	}
@@ -161,26 +115,6 @@ final class SubChunkOverride extends SubChunk {
 	public function getBlockDataArray() : string{
 		assert(strlen($this->data) === 2048, "Wrong length of data array, expecting 2048 bytes, got " . strlen($this->data));
 		return zlib_decode($this->data);
-	}
-
-	public function getBlockSkyLightArray() : string{
-		assert(strlen($this->skyLight) === 2048, "Wrong length of skylight array, expecting 2048 bytes, got " . strlen($this->skyLight));
-		return zlib_decode($this->skyLight);
-	}
-
-	public function setBlockSkyLightArray(string $data){
-		assert(strlen($data) === 2048, "Wrong length of skylight array, expecting 2048 bytes, got " . strlen($data));
-		$this->skyLight = zlib_encode($data, ZLIB_ENCODING_RAW, 7);
-	}
-
-	public function getBlockLightArray() : string{
-		assert(strlen($this->blockLight) === 2048, "Wrong length of light array, expecting 2048 bytes, got " . strlen($this->blockLight));
-		return zlib_decode($this->blockLight);
-	}
-
-	public function setBlockLightArray(string $data){
-		assert(strlen($data) === 2048, "Wrong length of light array, expecting 2048 bytes, got " . strlen($data));
-		$this->blockLight = zlib_encode($data, ZLIB_ENCODING_RAW, 7);
 	}
 
 }

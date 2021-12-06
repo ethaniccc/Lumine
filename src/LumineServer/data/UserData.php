@@ -3,6 +3,7 @@
 namespace LumineServer\data;
 
 use DateTime;
+use LumineServer\data\attack\AttackData;
 use LumineServer\data\auth\AuthData;
 use LumineServer\data\click\ClickData;
 use LumineServer\data\effect\EffectData;
@@ -31,17 +32,16 @@ use LumineServer\detections\range\RangeA;
 use LumineServer\detections\timer\TimerA;
 use LumineServer\detections\velocity\VelocityA;
 use LumineServer\detections\velocity\VelocityB;
-use LumineServer\Server;
 use LumineServer\socket\packets\RequestPunishmentPacket;
 use LumineServer\utils\AABB;
 use pocketmine\level\Location;
 use pocketmine\math\Vector3;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\DataPacket;
-use pocketmine\network\mcpe\protocol\DisconnectPacket;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\TextPacket;
 use pocketmine\network\mcpe\protocol\types\DeviceOS;
+use function LumineServer\subprocess\sendPacketToSocket;
 
 final class UserData {
 
@@ -61,7 +61,7 @@ final class UserData {
 	public Vector3 $previousServerPredictedMotion;
 	public Vector3 $serverSentMotion;
 	public Vector3 $lastOnGroundLocation;
-	public ?Vector3 $attackPos = null;
+	public ?AttackData $attackData = null;
 
 	public int $ticksSinceMotion = 0;
 	public int $ticksOnGround = 0;
@@ -107,6 +107,7 @@ final class UserData {
 	public LocationMap $locationMap;
 
 	public int $playerOS = DeviceOS::UNKNOWN;
+	public int $inputMode = -1;
 
 	public int $lastACKTick = -1;
 	public int $waitingACKCount = 0;
@@ -219,7 +220,7 @@ final class UserData {
 		$packet->identifier = $this->identifier;
 		$packet->type = RequestPunishmentPacket::TYPE_KICK;
 		$packet->message = $message;
-		Server::getInstance()->socketHandler->send($packet, $this->socketAddress);
+		sendPacketToSocket($packet);
 		$this->isClosed = true;
 	}
 
@@ -231,7 +232,7 @@ final class UserData {
 		if ($expiration !== null) {
 			$packet->expiration = $expiration->getTimestamp();
 		}
-		Server::getInstance()->socketHandler->send($packet, $this->socketAddress);
+		sendPacketToSocket($packet);
 		$this->isClosed = true;
 	}
 

@@ -4,11 +4,11 @@ namespace LumineServer\detections\auth;
 
 use LumineServer\data\UserData;
 use LumineServer\detections\DetectionModule;
-use LumineServer\Server;
 use pocketmine\network\mcpe\protocol\DataPacket;
 use pocketmine\network\mcpe\protocol\LoginPacket;
 use pocketmine\network\mcpe\protocol\types\DeviceOS;
 use pocketmine\utils\TextFormat;
+use function LumineServer\subprocess\log;
 
 final class AuthA extends DetectionModule {
 
@@ -33,10 +33,10 @@ final class AuthA extends DetectionModule {
 				default => null
 			};
 			if ($expectedOS === null) {
-				Server::getInstance()->logger->log(TextFormat::RED . "({$data->authData->username}) Unknown title ID: " . $data->authData->titleID . " Player OS: " . $data->playerOS);
+				log(TextFormat::RED . "({$data->authData->username}) Unknown title ID: " . $data->authData->titleID . " Player OS: " . $data->playerOS);
 				return;
 			}
-			Server::getInstance()->logger->log("{$data->authData->username} @ AuthA: expected=$expectedOS got={$data->playerOS} titleID={$data->authData->titleID}");
+			log("{$data->authData->username} @ AuthA: expected=$expectedOS got={$data->playerOS} titleID={$data->authData->titleID}");
 			if ($data->playerOS !== $expectedOS) {
 				$this->flag([
 					"expectedOS" => $expectedOS,

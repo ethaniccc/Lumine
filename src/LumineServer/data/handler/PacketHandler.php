@@ -4,13 +4,14 @@ namespace LumineServer\data\handler;
 
 use ethaniccc\Lumine\data\protocol\InputConstants;
 use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
+use LumineServer\data\attack\AttackData;
 use LumineServer\data\auth\AuthData;
 use LumineServer\data\effect\EffectData;
 use LumineServer\data\effect\ExtraEffectIds;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\UserData;
 use LumineServer\data\world\NetworkChunkDeserializer;
-use LumineServer\Server;
+use LumineServer\subprocess\hacks\RuntimeBlockMappingHack;
 use LumineServer\utils\AABB;
 use LumineServer\utils\LevelUtils;
 use pocketmine\block\BlockFactory;
@@ -24,7 +25,6 @@ use pocketmine\level\Level;
 use pocketmine\level\Location;
 use pocketmine\level\Position;
 use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
 use pocketmine\network\mcpe\NetworkBinaryStream;
 use pocketmine\network\mcpe\protocol\AddActorPacket;
 use pocketmine\network\mcpe\protocol\AddPlayerPacket;
@@ -49,12 +49,14 @@ use pocketmine\network\mcpe\protocol\SetActorMotionPacket;
 use pocketmine\network\mcpe\protocol\SetLocalPlayerAsInitializedPacket;
 use pocketmine\network\mcpe\protocol\SetPlayerGameTypePacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
+use pocketmine\network\mcpe\protocol\types\DeviceOS;
 use pocketmine\network\mcpe\protocol\types\GameMode;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemOnEntityTransactionData;
 use pocketmine\network\mcpe\protocol\types\inventory\UseItemTransactionData;
 use pocketmine\network\mcpe\protocol\UpdateAttributesPacket;
 use pocketmine\network\mcpe\protocol\UpdateBlockPacket;
 use pocketmine\utils\TextFormat;
+use function LumineServer\subprocess\getSettings;
 
 final class PacketHandler {
 
@@ -71,7 +73,7 @@ final class PacketHandler {
 
 	public function inbound(DataPacket $packet, float $timestamp): void {
 		$data = $this->data;
-		if ($data->isClosed) {
+		if ($data->isClosed || $data->playerOS === DeviceOS::PLAYSTATION) {
 			return;
 		}
 		$data->clickData->isClicking = false;
@@ -79,6 +81,8 @@ final class PacketHandler {
 			if ($packet->itemInteractionData !== null) {
 				$data->world->setBlock($packet->itemInteractionData->blockPos, 0, 0);
 			}
+
+			$data->inputMode = $packet->getInputMode();
 
 			if (InputConstants::hasFlag($packet, InputConstants::START_SNEAKING)) {
 				$data->isSneaking = true;
@@ -199,7 +203,7 @@ final class PacketHandler {
 				if ($data->waitingACKCount > 0) {
 					$tickDiff = $data->currentTick - $data->lastACKTick;
 					if ($tickDiff > 300 && $data->waitingACKCount >= 40) {
-						$data->kick(Server::getInstance()->settings->get(
+						$data->kick(getSettings()->get(
 							"timeout_message",
 							"NetworkStackLatency timeout (d=$tickDiff c={$data->waitingACKCount})\nPlease contact a staff member if this issue persists"
 						));
@@ -239,7 +243,7 @@ final class PacketHandler {
 				}
 			} elseif ($trData instanceof UseItemOnEntityTransactionData) {
 				$data->clickData->add($data->currentTick);
-				$data->attackPos = $trData->getPlayerPos();
+				$data->attackData = new AttackData($trData->getEntityRuntimeId(), $trData->getPlayerPos()->subtract(0, 1.62));
 			}
 		} elseif ($packet instanceof LoginPacket) {
 			$d = $packet->chainData;
@@ -267,7 +271,7 @@ final class PacketHandler {
 
 	public function outbound(BatchPacket $packet, float $timestamp): void {
 		$data = $this->data;
-		if ($data->isClosed) {
+		if ($data->isClosed || $data->playerOS === DeviceOS::PLAYSTATION) {
 			return;
 		}
 		foreach ($packet->getPackets() as $buffer) {
@@ -337,11 +341,13 @@ final class PacketHandler {
 						}
 					}, $pk);
 				} elseif ($pk instanceof UpdateBlockPacket) {
-					$blockId = RuntimeBlockMapping::fromStaticRuntimeId($pk->blockRuntimeId)[0];
+					$blockId = RuntimeBlockMappingHack::fromStaticRuntimeId($pk->blockRuntimeId)[0];
 					$position = new Vector3($pk->x, $pk->y, $pk->z);
 					$realBlock = $data->world->getBlock($position);
 					if ($realBlock->getId() !== $blockId) {
-						$data->ghostBlockHandler->suspect(BlockFactory::get($blockId, 0, Position::fromObject($position)));
+						try {
+							$data->ghostBlockHandler->suspect(BlockFactory::get($blockId, 0, Position::fromObject($position)));
+						} catch (\InvalidArgumentException $e) {}
 					}
 				} elseif ($pk instanceof StartGamePacket) {
 					$data->entityRuntimeId = $pk->entityRuntimeId;
@@ -363,7 +369,7 @@ final class PacketHandler {
 			});
 		} elseif ($packet instanceof UpdateBlockPacket) {
 			$data->latencyManager->add($timestamp, function () use ($data, $packet): void {
-				$real = RuntimeBlockMapping::fromStaticRuntimeId($packet->blockRuntimeId);
+				$real = RuntimeBlockMappingHack::fromStaticRuntimeId($packet->blockRuntimeId);
 				$data->world->setBlock(new Vector3($packet->x, $packet->y, $packet->z), $real[0], 0);
 			});
 		} elseif ($packet instanceof MobEffectPacket && $packet->entityRuntimeId === $data->entityRuntimeId) {
@@ -459,7 +465,7 @@ final class PacketHandler {
 				}
 			});
 		} else {
-			Server::getInstance()->logger->log("{$data->authData->username}: Got lag compensation for {$packet->getName()} - lag compensation is unhandled");
+			\LumineServer\subprocess\log("Lag compensation was unhandled");
 		}
 	}
 

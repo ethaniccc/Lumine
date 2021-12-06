@@ -83,7 +83,8 @@ detections:
   Range:
     A:
       enabled: true
-      max_dist: 3.1
+      max_dist_normal: 3.04
+      max_dist_touchscreen: 3.1
       punishment_type: kick
       max_vl: 25
       codename: IRD

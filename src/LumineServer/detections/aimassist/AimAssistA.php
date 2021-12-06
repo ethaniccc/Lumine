@@ -47,8 +47,8 @@ final class AimAssistA extends DetectionModule {
 				$yawDiff = 180 - fmod($yawDiff, 180);
 			}
 			if ($locationData !== null) {
-				$xDist = $locationData->lastPos->x - $data->attackPos->x;
-				$zDist = $locationData->lastPos->z - $data->attackPos->z;
+				$xDist = $locationData->lastPos->x - $data->attackData->attackPos->x;
+				$zDist = $locationData->lastPos->z - $data->attackData->attackPos->z;
 				$aimbotYaw = fmod(atan2($zDist, $xDist) / M_PI * 180 - 90, 180);
 				$aimbotDiff = $aimbotYaw - $data->lastPos->yaw;
 				if ($aimbotDiff >= 180) {

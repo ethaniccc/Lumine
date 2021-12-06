@@ -15,6 +15,10 @@ namespace LumineServer {
 		try {
 			$server->run();
 		} catch (\Exception $e) {
+			echo "Error: {$e->getMessage()}\n";
+			echo $e->getTraceAsString() . PHP_EOL;
+			$server->kill();
+			echo "Killing application\n";
 			exit();
 		}
 	}

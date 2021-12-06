@@ -6,7 +6,9 @@ use ethaniccc\Lumine\data\protocol\v428\PlayerAuthInputPacket;
 use LumineServer\data\DataStorage;
 use LumineServer\data\UserData;
 use LumineServer\detections\DetectionModule;
+use LumineServer\socket\packets\HeartbeatPacket;
 use LumineServer\socket\SocketHandler;
+use LumineServer\subprocess\LumineSubprocess;
 use LumineServer\threads\CommandThread;
 use LumineServer\threads\LoggerThread;
 use LumineServer\threads\WebhookThread;
@@ -46,6 +48,9 @@ final class Server {
 	public bool $performanceLogging = false;
 	public int $currentTick = 0;
 	public float $currentTPS = self::TPS;
+
+	/** @var \Shmop[] */
+	private array $sharedMemoryBlocks = [];
 
 	public function __construct() {
 		self::$instance = $this;
@@ -130,55 +135,46 @@ final class Server {
 		$this->socketHandler->start();
 		$this->logger->log("Socket handler started");
 
-		Attribute::init();
-		PacketPool::init();
-		PacketPool::registerPacket(new PlayerAuthInputPacket());
 		\LumineServer\socket\packets\PacketPool::init();
-		ItemFactory::init();
-		BlockFactory::init();
-		//RuntimeBlockMapping::init();
 		$this->setupRuntimeBlockMapping();
-		//ItemTypeDictionary::getInstance();
-		$this->setupItemTypeDictionary();
-		//ItemTranslator::getInstance();
-		$this->setupItemTranslator();
-		//BlockFactory::registerBlock(new WoodenFenceOverride(), true);
-		DetectionModule::init();
-		MCMathHelper::init();
-		$this->logger->log("Initialized data");
+
 		ini_set("memory_limit", $this->settings->get("memory_limit", "1024M"));
 		$time = round(microtime(true) - $start, 4);
 		$this->logger->log("Lumine server has started in $time seconds");
 
 		while ($this->running) {
-			try {
-				++$this->currentTick;
-				$start = microtime(true);
-				$this->socketHandler->tick();
-				$delta = microtime(true) - $start;
-				$this->currentTPS = min(self::TPS, 1 / max(0.0001, $delta));
-				if ($this->performanceLogging) {
-					$cpu = function_exists("sys_getloadavg") ? sys_getloadavg()[0] : "N/A";
-					$memory = round(memory_get_usage() / 1e+6, 4) . "MB";
-					$load = round($delta / (1 / $this->currentTPS), 5) * 100;
-					$this->logger->log("CPU=$cpu% Memory=$memory Load=$load%", false);
+			++$this->currentTick;
+			$start = microtime(true);
+			$this->socketHandler->tick();
+			foreach ($this->dataStorage->getAll() as $queue) {
+				foreach ($queue as $proc) {
+					/** @var LumineSubprocess $proc */
+					$proc->check();
 				}
-				if ($delta <= 1 / self::TPS) {
-					$this->tickSleeper->sleepUntil(microtime(true) + (1 / self::TPS) - $delta);
-				} else {
-					$this->logger->log("Server running slower than normal (delta=$delta) - not sleeping to catch up");
-				}
-			} catch (\Error|\Exception $e) {
-				$this->logger->log("The socket server had an error while ticking - a shutdown will be preformed");
-				$this->logger->log($e->getMessage() . PHP_EOL . $e->getTraceAsString());
-				break;
+			}
+			$delta = microtime(true) - $start;
+			$this->currentTPS = min(self::TPS, 1 / max(0.0001, $delta));
+			if ($this->performanceLogging) {
+				$cpu = function_exists("sys_getloadavg") ? sys_getloadavg()[0] : "N/A";
+				$memory = round(memory_get_usage() / 1e+6, 4) . "MB";
+				$load = round($delta / (1 / $this->currentTPS), 5) * 100;
+				$this->logger->log("CPU=$cpu% Memory=$memory Load=$load%", false);
+			}
+			if ($delta <= 1 / self::TPS) {
+				$this->tickSleeper->sleepUntil(microtime(true) + (1 / self::TPS) - $delta);
+			} elseif ($delta >= 1) {
+				$this->logger->log("Server running slow (delta=$delta)", false);
 			}
 		}
 		echo "Shutting down the Lumine server...\n";
+		$this->dataStorage->kill();
 		$this->socketHandler->shutdown();
 		$this->logger->quit();
 		$this->console->quit();
 		$this->webhookThread->quit();
+		foreach ($this->sharedMemoryBlocks as $block) {
+			shmop_delete($block);
+		}
 		exit("Terminated." . PHP_EOL);
 	}
 
@@ -254,83 +250,39 @@ final class Server {
 			throw new RuntimeException("Mapped new state does not appear in network table");
 		}
 		$reflection->setStaticPropertyValue("bedrockKnownStates", $list);
+		$this->createSharedMemoryBlock("bedrockKnownStates");
+		$this->writeToSharedMemoryBlock("bedrockKnownStates", zlib_encode(serialize($list), ZLIB_ENCODING_RAW, 9));
 		$reflection->setStaticPropertyValue("runtimeToLegacyMap", $runtimeToLegacyMap);
+		$this->createSharedMemoryBlock("runtimeToLegacyMap");
+		$this->writeToSharedMemoryBlock("runtimeToLegacyMap", zlib_encode(serialize($runtimeToLegacyMap), ZLIB_ENCODING_RAW));
 		$reflection->setStaticPropertyValue("legacyToRuntimeMap", $legacyToRuntimeMap);
+		$this->createSharedMemoryBlock("legacyToRuntimeMap");
+		$this->writeToSharedMemoryBlock("legacyToRuntimeMap", zlib_encode(serialize($legacyToRuntimeMap), ZLIB_ENCODING_RAW));
 	}
 
-	private function setupItemTypeDictionary(): void {
-		$data = file_get_contents('resources/required_item_list.json');
-		if ($data === false) throw new AssumptionFailedError("Missing required resource file");
-		$table = json_decode($data, true);
-		if (!is_array($table)) {
-			throw new AssumptionFailedError("Invalid item list format");
+	private function createSharedMemoryBlock(string $name, string $mode = "n", int $permission = 0644, int $size = 153600): void {
+		$block = @shmop_open(count($this->sharedMemoryBlocks) + 1, $mode, $permission, $size);
+		if ($block === false) {
+			$this->logger->log("Memory block already exists, using default");
+			$block = shmop_open(count($this->sharedMemoryBlocks) + 1, "w", $permission, $size);
 		}
-
-		$params = [];
-		foreach ($table as $name => $entry) {
-			if (!is_array($entry) || !is_string($name) || !isset($entry["component_based"], $entry["runtime_id"]) || !is_bool($entry["component_based"]) || !is_int($entry["runtime_id"])) {
-				throw new AssumptionFailedError("Invalid item list format");
-			}
-			$params[] = new ItemTypeEntry($name, $entry["runtime_id"], $entry["component_based"]);
-		}
-		ItemTypeDictionary::setInstance(new ItemTypeDictionary($params));
+		$this->sharedMemoryBlocks[strtolower($name)] = $block;
 	}
 
-	private function setupItemTranslator(): void {
-		$data = file_get_contents('resources/r16_to_current_item_map.json');
-		if ($data === false) throw new AssumptionFailedError("Missing required resource file");
-		$json = json_decode($data, true);
-		if (!is_array($json) or !isset($json["simple"], $json["complex"]) || !is_array($json["simple"]) || !is_array($json["complex"])) {
-			throw new AssumptionFailedError("Invalid item table format");
-		}
-
-		$legacyStringToIntMapRaw = file_get_contents('resources/item_id_map.json');
-		if ($legacyStringToIntMapRaw === false) {
-			throw new AssumptionFailedError("Missing required resource file");
-		}
-		$legacyStringToIntMap = json_decode($legacyStringToIntMapRaw, true);
-		if (!is_array($legacyStringToIntMap)) {
-			throw new AssumptionFailedError("Invalid mapping table format");
-		}
-
-		/** @phpstan-var array<string, int> $simpleMappings */
-		$simpleMappings = [];
-		foreach ($json["simple"] as $oldId => $newId) {
-			if (!is_string($oldId) || !is_string($newId)) {
-				throw new AssumptionFailedError("Invalid item table format");
+	private function writeToSharedMemoryBlock(string $name, string $data, int $offset = 0): void {
+		$block = $this->sharedMemoryBlocks[strtolower($name)] ?? null;
+		if ($block !== null) {
+			if (($blockSize = shmop_size($block)) < ($dataSize = strlen($data)) + 4) {
+				throw new \InvalidArgumentException("Data size ($dataSize) is larger than size of shared memory block ($blockSize)");
 			}
-			if (!isset($legacyStringToIntMap[$oldId])) {
-				//new item without a fixed legacy ID - we can't handle this right now
-				continue;
-			}
-			$simpleMappings[$newId] = $legacyStringToIntMap[$oldId];
+			shmop_write($block, pack("l", strlen($data)) . $data, $offset);
 		}
-		foreach ($legacyStringToIntMap as $stringId => $intId) {
-			if (isset($simpleMappings[$stringId])) {
-				throw new UnexpectedValueException("Old ID $stringId collides with new ID");
-			}
-			$simpleMappings[$stringId] = $intId;
-		}
-
-		/** @phpstan-var array<string, array{int, int}> $complexMappings */
-		$complexMappings = [];
-		foreach ($json["complex"] as $oldId => $map) {
-			if (!is_string($oldId) || !is_array($map)) {
-				throw new AssumptionFailedError("Invalid item table format");
-			}
-			foreach ($map as $meta => $newId) {
-				if (!is_numeric($meta) || !is_string($newId)) {
-					throw new AssumptionFailedError("Invalid item table format");
-				}
-				$complexMappings[$newId] = [$legacyStringToIntMap[$oldId], (int)$meta];
-			}
-		}
-
-		ItemTranslator::setInstance(new ItemTranslator(ItemTypeDictionary::getInstance(), $simpleMappings, $complexMappings));
 	}
 
-	public function getLuminePrefix(): string {
-		return $this->settings->get("prefix", "§l§8[§dL§6u§em§bi§5n§de§8]") . TextFormat::RESET;
+	public function kill(): void {
+		foreach ($this->sharedMemoryBlocks as $block) {
+			shmop_delete($block);
+		}
 	}
 
 }

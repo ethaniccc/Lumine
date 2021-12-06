@@ -45,8 +45,6 @@ final class NetworkStackLatencyManager {
 			($this->list[$timestamp])($receive);
 			$this->data->lastACKTick = $this->data->currentTick;
 			$this->data->waitingACKCount--;
-		} else {
-			Server::getInstance()->logger->log("{$this->data->authData->username} sent NSL with timestamp of $timestamp, but no callable was found");
 		}
 		unset($this->list[$timestamp]);
 	}

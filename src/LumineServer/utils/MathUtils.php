@@ -2,6 +2,8 @@
 
 namespace LumineServer\utils;
 
+use pocketmine\math\Vector3;
+
 /**
  * @author Github Copilot - An absoulte madlad.
  */
@@ -147,5 +149,13 @@ final class MathUtils {
 		}
         return $covariance / ($xStdDev * $yStdDev);
     }
+
+	public static function directionVectorFromValues(float $yaw, float $pitch): Vector3 {
+		$var2 = cos(-$yaw * 0.017453292 - M_PI);
+		$var3 = sin(-$yaw * 0.017453292 - M_PI);
+		$var4 = -(cos(-$pitch * 0.017453292));
+		$var5 = sin(-$pitch * 0.017453292);
+		return new Vector3($var3 * $var4, $var5, $var2 * $var4);
+	}
 
 }

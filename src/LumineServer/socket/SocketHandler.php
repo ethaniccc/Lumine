@@ -2,6 +2,7 @@
 
 namespace LumineServer\socket;
 
+use LumineServer\data\DataStorage;
 use LumineServer\data\UserData;
 use LumineServer\Server;
 use LumineServer\socket\packets\CommandRequestPacket;
@@ -71,6 +72,25 @@ final class SocketHandler {
 		}
 	}
 
+	public function sendRaw(string $buffer, string $socketAddr): void {
+		$client = $this->clients[$socketAddr] ?? null;
+		if ($client === null) {
+			Server::getInstance()->logger->log("Unable to send packet to $socketAddr because it is not connected connected=[" . implode(", ", array_keys($this->clients)) . "]");
+			return;
+		}
+		$len = strlen($buffer);
+		retry_send:
+		$res = @socket_write($client->socket, $buffer);
+		if ($res === false) {
+			Server::getInstance()->logger->log("Unable to send data to {$client->address} - terminating connection");
+			@socket_close($client->socket);
+			unset($this->clients[$client->address]);
+		} elseif ($res !== $len) {
+			$buffer = substr($buffer, $res);
+			goto retry_send;
+		}
+	}
+
 	/**
 	 * @param Packet $packet
 	 * @param string $socketAddr
@@ -133,135 +153,48 @@ final class SocketHandler {
 					$packet = PacketPool::getPacket($buffer);
 					if ($packet === null) {
 						$len = strlen($buffer);
-						Server::getInstance()->logger->log("Unable to create data from received buffer from {$client->address} (len=$len)");
+						Server::getInstance()->logger->log("Unable to create process from received buffer from {$client->address} (len=$len)");
 						$toRemove = true;
 						goto end;
 					} else {
 						$packet->decode();
 						if ($packet instanceof ServerSendDataPacket) {
-							$data = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
-							if ($data === null) {
-								Server::getInstance()->logger->log("{$packet->identifier} had a packet event, but no data was found");
+							$process = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
+							if ($process === null) {
+								Server::getInstance()->logger->log("{$packet->identifier} had a packet event, but no process was found");
 								goto finish_read;
 							}
-							if ($packet->eventType === ServerSendDataPacket::SERVER_SEND_PACKET) {
-								$pk = new BatchPacket($packet->packetBuffer);
-								$pk->decode();
-								$data->handler->outbound($pk, $packet->timestamp);
-							} elseif ($packet->eventType === ServerSendDataPacket::PLAYER_SEND_PACKET) {
-								$pk = \pocketmine\network\mcpe\protocol\PacketPool::getPacket($packet->packetBuffer);
-								$pk->decode();
-								$data->handler->inbound($pk, $packet->timestamp);
-							} else {
-								Server::getInstance()->logger->log("Invalid event type ({$packet->eventType}) received in ServerSendDataPacket");
-							}
+							$process->queue($packet);
 						} elseif ($packet instanceof UpdateUserPacket) {
 							if ($packet->action === UpdateUserPacket::ACTION_ADD) {
 								Server::getInstance()->dataStorage->add($packet->identifier, $client->address);
-								Server::getInstance()->logger->log("Added user data {$packet->identifier}");
+								Server::getInstance()->logger->log("Added user process {$packet->identifier}");
 							} elseif ($packet->action === UpdateUserPacket::ACTION_REMOVE) {
-								Server::getInstance()->dataStorage->remove($packet->identifier, $client->address);								Server::getInstance()->logger->log("Added user data {$packet->identifier}");
-								Server::getInstance()->logger->log("Removed user data {$packet->identifier}");
+								Server::getInstance()->dataStorage->remove($packet->identifier, $client->address);								Server::getInstance()->logger->log("Added user process {$packet->identifier}");
+								Server::getInstance()->logger->log("Removed user process {$packet->identifier}");
 							} else {
 								Server::getInstance()->logger->log("Invalid action ({$packet->action}) received in UpdateUserPacket");
 							}
 						} elseif ($packet instanceof LagCompensationPacket) {
-							$data = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
-							if ($data === null) {
-								Server::getInstance()->logger->log("{$packet->identifier} had a lag compensation event, but no data was found");
+							$process = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
+							if ($process === null) {
+								Server::getInstance()->logger->log("{$packet->identifier} had a lag compensation event, but no process was found");
 								goto finish_read;
 							}
-							if ($packet->isBatch) {
-								$pk = new BatchPacket($packet->packetBuffer);
-							} else {
-								$pk = \pocketmine\network\mcpe\protocol\PacketPool::getPacket($packet->packetBuffer);
-							}
-							$pk->decode();
-							$data->handler->compensate($pk, $packet->timestamp);
+							$process->queue($packet);
 						} elseif ($packet instanceof CommandRequestPacket) {
 							switch ($packet->command) {
 								case "logs":
-									$targetPlayer = array_shift($packet->args);
-									if ($targetPlayer === null) {
+								case "debug":
+									$process = Server::getInstance()->dataStorage->get(array_shift($packet->args), $client->address);
+									if ($process === null) {
 										$pk = new CommandResponsePacket();
 										$pk->target = $packet->sender;
-										$pk->response = TextFormat::RED . "You need to specify a player to get the logs of.";
+										$pk->response = TextFormat::RED . "Process not found for the specified target";
+										$this->send($pk, $client->address);
 									} else {
-										$dataList = Server::getInstance()->dataStorage->find($targetPlayer);
-										if (count($dataList) === 0) {
-											$pk = new CommandResponsePacket();
-											$pk->target = $packet->sender;
-											$pk->response = TextFormat::RED . "$targetPlayer was not found on the socket server";
-										} else {
-											$message = "";
-											$times = 1;
-											foreach ($dataList as $otherData) {
-												$message .= TextFormat::UNDERLINE . TextFormat::GOLD . "Server no." . TextFormat::YELLOW . $times . TextFormat::RESET . PHP_EOL;
-												$logs = 0;
-												foreach ($otherData->detections as $detection) {
-													if ($detection->violations >= 2) {
-														$message .= TextFormat::AQUA . "(" . TextFormat::LIGHT_PURPLE . var_export(round($detection->violations, 2), true) . TextFormat::AQUA . ") ";
-														$message .= TextFormat::GRAY . $detection->category . " (" . TextFormat::YELLOW . $detection->subCategory . TextFormat::GRAY . ") ";
-														$message .= TextFormat::DARK_GRAY . "- " . TextFormat::GOLD . $detection->description . PHP_EOL;
-														$logs++;
-													}
-												}
-												if ($logs === 0) {
-													$message .= TextFormat::GREEN . "No logs found for {$otherData->authData->username}" . PHP_EOL;
-												}
-												$times++;
-											}
-											$pk = new CommandResponsePacket();
-											$pk->target = $packet->sender;
-											$pk->response = $message;
-										}
+										$process->queue($packet);
 									}
-									$this->send($pk, $client->address);
-									break;
-								case "debug":
-									$targetW = array_shift($packet->args);
-									$pk = new CommandResponsePacket();
-									$pk->target = $packet->sender;
-									if ($targetW === null) {
-										$pk->response = TextFormat::RED . "You need to specify a target player.";
-									} else {
-										$target = Server::getInstance()->dataStorage->find($targetW)[0] ?? null;
-										if ($target === null) {
-											$pk->response = TextFormat::RED . "$targetW was not found in any server connected to Lumine.";
-										} else {
-											$action = array_shift($packet->args);
-											if ($action === null) {
-												$pk->response = TextFormat::RED . "You must specify if you want to subscribe or unsubscribe to a channel.";
-											} else {
-												$action = strtolower($action);
-												$wantedChannel = array_shift($packet->args);
-												if ($wantedChannel === null) {
-													$pk->response = TextFormat::RED . "You need to specify a debug channel.";
-												} else {
-													$channel = $target->debugHandler->getChannel($wantedChannel);
-													if ($channel === null) {
-														$pk->response = TextFormat::RED . "$wantedChannel is not a valid debug channel.";
-													} else {
-														$sub = Server::getInstance()->dataStorage->get($packet->sender, $client->address);
-														if ($packet->sender === "CONSOLE") {
-															$pk->response = TextFormat::RED . "You cannot run this command from the console.";
-														} elseif ($sub === null) {
-															$pk->response = TextFormat::DARK_RED . "CRITICAL ERROR - You were not found.";
-														} elseif ($action === "subscribe" || $action === "sub") {
-															$channel->subscribe($sub);
-															$pk->response = TextFormat::GREEN . "You have been subscribed to the debug channel!";
-														} elseif ($action === "unsubscribe" || $action === "unsub") {
-															$channel->unsubscribe($sub);
-															$pk->response = TextFormat::GREEN . "You have been unsubscribed from the debug channel!";
-														} else {
-															$pk->response = TextFormat::RED . "Invalid action.";
-														}
-													}
-												}
-											}
-										}
-									}
-									$this->send($pk, $client->address);
 									break;
 							}
 						}
@@ -303,23 +236,6 @@ final class SocketHandler {
 		if (microtime(true) - $client->lastACK >= 60 + $oDelta) {
 			Server::getInstance()->logger->log("Client {$client->address} timed out, removing connection...");
 			$toRemove = true;
-		}
-
-		foreach (Server::getInstance()->dataStorage->getFromSocket($client->address) as $data) {
-			/** @var UserData $data */
-			if ($data->sendPackets > 0) {
-				$data->sendQueue->encode();
-				$pk = new ServerSendDataPacket();
-				$pk->eventType = ServerSendDataPacket::SERVER_SEND_PACKET;
-				$pk->identifier = $data->identifier;
-				$pk->packetBuffer = $data->sendQueue->getBuffer();
-				$pk->timestamp = microtime(true);
-				$this->send($pk, $client->address);
-				$data->sendPackets = 0;
-				unset($data->sendQueue);
-				$data->sendQueue = new BatchPacket();
-				$data->sendQueue->setCompressionLevel(7);
-			}
 		}
 
 		if (Server::getInstance()->currentTick % Server::TPS === 0 && !$toRemove) {
