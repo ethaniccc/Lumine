@@ -11,6 +11,7 @@ use LumineServer\data\effect\ExtraEffectIds;
 use LumineServer\data\movement\MovementConstants;
 use LumineServer\data\UserData;
 use LumineServer\data\world\NetworkChunkDeserializer;
+use LumineServer\data\world\SubChunkOverride;
 use LumineServer\Server;
 use LumineServer\utils\AABB;
 use LumineServer\utils\LevelUtils;
@@ -207,6 +208,14 @@ final class PacketHandler {
 					}
 				} else {
 					$data->lastACKTick = $data->currentTick;
+				}
+			}
+
+			foreach ($data->world->getAllChunks() as $chunk) {
+				foreach ($chunk->getSubChunks() as $subChunk) {
+					if ($subChunk instanceof SubChunkOverride) {
+						$subChunk->encodeData();
+					}
 				}
 			}
 		} elseif ($packet instanceof SetLocalPlayerAsInitializedPacket) {

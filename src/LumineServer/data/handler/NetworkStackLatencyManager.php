@@ -34,7 +34,7 @@ final class NetworkStackLatencyManager {
 
 	public function send(Closure $run): void {
 		$packet = new NetworkStackLatencyPacket();
-		$packet->timestamp = mt_rand(1, 100000000) * 1000;
+		$packet->timestamp = mt_rand(1, 1000000) * 1000;
 		$packet->needResponse = true;
 		$this->add($packet->timestamp, $run);
 		$this->data->queue($packet);
@@ -45,8 +45,6 @@ final class NetworkStackLatencyManager {
 			($this->list[$timestamp])($receive);
 			$this->data->lastACKTick = $this->data->currentTick;
 			$this->data->waitingACKCount--;
-		} else {
-			Server::getInstance()->logger->log("{$this->data->authData->username} sent NSL with timestamp of $timestamp, but no callable was found");
 		}
 		unset($this->list[$timestamp]);
 	}

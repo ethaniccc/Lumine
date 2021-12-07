@@ -179,7 +179,6 @@ final class Server {
 		$this->logger->quit();
 		$this->console->quit();
 		$this->webhookThread->quit();
-		exit("Terminated." . PHP_EOL);
 	}
 
 	public function shutdown(): void {

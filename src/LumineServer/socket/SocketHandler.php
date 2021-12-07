@@ -14,6 +14,7 @@ use LumineServer\socket\packets\ServerSendDataPacket;
 use LumineServer\socket\packets\UpdateUserPacket;
 use pocketmine\network\mcpe\protocol\BatchPacket;
 use pocketmine\network\mcpe\protocol\UnknownPacket;
+use pocketmine\utils\AssumptionFailedError;
 use pocketmine\utils\TextFormat;
 use Socket;
 
@@ -51,14 +52,37 @@ final class SocketHandler {
 		/** @var string[] $removeList */
 		$removeList = [];
 		foreach ($this->clients as $client) {
-			if (!$this->process($client)) {
+			$retries = 0;
+			if ($this->handleInboundPackets($client, $retries) === null) {
 				@socket_close($client->socket);
 				$removeList[] = $client->address;
+			} else {
+				foreach (Server::getInstance()->dataStorage->getFromSocket($client->address) as $data) {
+					if ($data->sendPackets > 0) {
+						$data->sendQueue->encode();
+						$pk = new ServerSendDataPacket();
+						$pk->eventType = ServerSendDataPacket::SERVER_SEND_PACKET;
+						$pk->identifier = $data->identifier;
+						$pk->packetBuffer = $data->sendQueue->getBuffer();
+						$pk->timestamp = microtime(true);
+						$this->send($pk, $client->address);
+						$data->sendPackets = 0;
+						unset($data->sendQueue);
+						$data->sendQueue = new BatchPacket();
+						$data->sendQueue->setCompressionLevel(7);
+					}
+				}
+
+				if (Server::getInstance()->currentTick % Server::TPS === 0) {
+					$this->send(new HeartbeatPacket(), $client->address);
+				}
 			}
+			unset($retries);
 		}
 
 		foreach ($removeList as $address) {
 			Server::getInstance()->dataStorage->reset($address);
+			Server::getInstance()->logger->log("Connection for $address terminated");
 			unset($this->clients[$address]);
 		}
 	}
@@ -97,52 +121,68 @@ final class SocketHandler {
 		}
 	}
 
-	private function process(SocketData $client): bool {
-		$s = microtime(true);
-		$toRemove = false;
-		$times = 0;
-		retry_read:
+	private function handleInboundPackets(SocketData $client, int &$retries, bool $clear = false): ?bool {
+		if ($clear) {
+			$client->toRead = 4;
+			$client->isAwaitingBuffer = false;
+			$client->recvBuffer = "";
+		}
 		$current = @socket_read($client->socket, $client->toRead);
 		if ($current === "") {
 			$error = socket_last_error($client->socket);
 			if ($error !== 0) {
 				Server::getInstance()->logger->log("Socket client {$client->address} had an error (empty buffer): " . socket_strerror($error));
 			}
-			$toRemove = true;
-			goto end;
+			return null;
 		} elseif ($current === false) {
-			$times++;
-			goto end;
+			$retries++;
+			return $retries < 5 && $this->handleInboundPackets($client, $retries);
 		} else {
-			$times = 0;
 			$client->lastACK = microtime(true);
-			$length = strlen($current);
-			if ($client->isAwaitingBuffer) {
+			if (!$client->isAwaitingBuffer) {
+				$client->recvBuffer .= $current;
+				if (strlen($client->recvBuffer) !== 4) {
+					$client->toRead -= strlen($current);
+					//Server::getInstance()->logger->log("Failed to get full 4 bytes (current=" . strlen($client->toRead) . ")");
+					return $this->handleInboundPackets($client, $retries);
+				} else {
+					$unpacked = @unpack("l", $client->recvBuffer)[1];
+					if ($unpacked !== false && $unpacked !== null) {
+						$client->toRead = $unpacked;
+						$client->isAwaitingBuffer = true;
+						$client->recvBuffer = "";
+						return $this->handleInboundPackets($client, $retries);
+					} else {
+						Server::getInstance()->logger->log("Unable to unpack read length from {$client->socket}");
+						return null;
+					}
+				}
+			} else {
+				$length = strlen($current);
 				$client->recvBuffer .= $current;
 				if ($length !== $client->toRead) {
 					$client->toRead -= strlen($current);
 					//Server::getInstance()->logger->log("Need to retry read (remaining={$client->toRead})", false);
-					goto retry_read;
+					return $this->handleInboundPackets($client, $retries);
 				} else {
 					$buffer = zlib_decode($client->recvBuffer);
 					if ($buffer === false) {
 						Server::getInstance()->logger->log("Unable to decode buffer from {$client->address}");
-						$toRemove = true;
-						goto end;
+						return false;
 					}
 					$packet = PacketPool::getPacket($buffer);
 					if ($packet === null) {
 						$len = strlen($buffer);
 						Server::getInstance()->logger->log("Unable to create data from received buffer from {$client->address} (len=$len)");
-						$toRemove = true;
-						goto end;
+						return false;
 					} else {
+						$retries = 0;
 						$packet->decode();
 						if ($packet instanceof ServerSendDataPacket) {
 							$data = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
 							if ($data === null) {
 								Server::getInstance()->logger->log("{$packet->identifier} had a packet event, but no data was found");
-								goto finish_read;
+								return $this->handleInboundPackets($client, $retries, true);
 							}
 							if ($packet->eventType === ServerSendDataPacket::SERVER_SEND_PACKET) {
 								$pk = new BatchPacket($packet->packetBuffer);
@@ -169,7 +209,7 @@ final class SocketHandler {
 							$data = Server::getInstance()->dataStorage->get($packet->identifier, $client->address);
 							if ($data === null) {
 								Server::getInstance()->logger->log("{$packet->identifier} had a lag compensation event, but no data was found");
-								goto finish_read;
+								return $this->handleInboundPackets($client, $retries, true);
 							}
 							if ($packet->isBatch) {
 								$pk = new BatchPacket($packet->packetBuffer);
@@ -265,73 +305,11 @@ final class SocketHandler {
 									break;
 							}
 						}
+						return $this->handleInboundPackets($client, $retries, true);
 					}
-					finish_read:
-					$client->toRead = 4;
-					$client->isAwaitingBuffer = false;
-					$client->recvBuffer = "";
 				}
-				unset($packet);
-				goto retry_read;
-			} else {
-				$client->recvBuffer .= $current;
-				if (strlen($client->recvBuffer) !== 4) {
-					$client->toRead -= strlen($current);
-					//Server::getInstance()->logger->log("Failed to get full 4 bytes (current=" . strlen($client->toRead) . ")");
-					goto retry_read;
-				} else {
-					$unpacked = @unpack("l", $client->recvBuffer)[1];
-					if ($unpacked !== false && $unpacked !== null) {
-						$client->toRead = $unpacked;
-						$client->isAwaitingBuffer = true;
-					} else {
-						$toRemove = true;
-						Server::getInstance()->logger->log("Unable to unpack read length from {$client->socket}");
-						goto end;
-					}
-					$client->recvBuffer = "";
-				}
-				//Server::getInstance()->logger->log("expecting to read $unpacked bytes", false);
 			}
 		}
-		end:
-		if ($times !== 5 && !$toRemove) {
-			goto retry_read;
-		}
-		unset($current);
-		$oDelta = microtime(true) - $s;
-		if (microtime(true) - $client->lastACK >= 60 + $oDelta) {
-			Server::getInstance()->logger->log("Client {$client->address} timed out, removing connection...");
-			$toRemove = true;
-		}
-
-		foreach (Server::getInstance()->dataStorage->getFromSocket($client->address) as $data) {
-			/** @var UserData $data */
-			if ($data->sendPackets > 0) {
-				$data->sendQueue->encode();
-				$pk = new ServerSendDataPacket();
-				$pk->eventType = ServerSendDataPacket::SERVER_SEND_PACKET;
-				$pk->identifier = $data->identifier;
-				$pk->packetBuffer = $data->sendQueue->getBuffer();
-				$pk->timestamp = microtime(true);
-				$this->send($pk, $client->address);
-				$data->sendPackets = 0;
-				unset($data->sendQueue);
-				$data->sendQueue = new BatchPacket();
-				$data->sendQueue->setCompressionLevel(7);
-			}
-		}
-
-		if (Server::getInstance()->currentTick % Server::TPS === 0 && !$toRemove) {
-			$this->send(new HeartbeatPacket(), $client->address);
-		}
-
-		if ($toRemove) {
-			Server::getInstance()->logger->log("Connection for {$client->address} terminated");
-			return false;
-		}
-
-		return true;
 	}
 
 }
