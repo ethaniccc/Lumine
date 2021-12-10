@@ -21,6 +21,9 @@ final class AutoclickerA extends DetectionModule {
 				$this->flag([
 					"cps" => $cps
 				]);
+				if ($cps > 50) {
+					$data->kick("You've been kicked to prevent any crashes to the server [code=CC1]\nContact staff if this issue persists");
+				}
 			} else {
 				$this->violations = max($this->violations - 0.0075, 0);
 			}

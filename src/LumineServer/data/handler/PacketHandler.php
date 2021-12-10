@@ -78,6 +78,8 @@ final class PacketHandler {
 		}
 		$data->clickData->isClicking = false;
 		if ($packet instanceof PlayerAuthInputPacket) {
+			$data->inputMode = $packet->getInputMode();
+
 			if ($packet->itemInteractionData !== null) {
 				$data->world->setBlock($packet->itemInteractionData->blockPos, 0, 0);
 			}
@@ -351,7 +353,12 @@ final class PacketHandler {
 					$position = new Vector3($pk->x, $pk->y, $pk->z);
 					$realBlock = $data->world->getBlock($position);
 					if ($realBlock->getId() !== $blockId) {
-						$data->ghostBlockHandler->suspect(BlockFactory::get($blockId, 0, Position::fromObject($position)));
+						try {
+							$block = BlockFactory::get($blockId, 0, Position::fromObject($position));
+						} catch (\InvalidArgumentException $_) {
+							$block = new UnknownBlock($blockId, 0);
+						}
+						$data->ghostBlockHandler->suspect($block);
 					}
 				} elseif ($pk instanceof StartGamePacket) {
 					$data->entityRuntimeId = $pk->entityRuntimeId;

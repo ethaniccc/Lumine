@@ -5,3 +5,5 @@ bin-linux-8/*
 vendor/*
 logs/*
 prod_config/*
+server.log
+tests/*

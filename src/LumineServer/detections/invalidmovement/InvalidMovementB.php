@@ -25,7 +25,7 @@ final class InvalidMovementB extends DetectionModule {
 			$lastDiff = abs($data->motion->y - $this->lastPrediction->y);
 			$this->debug("diff=$diff lastDiff=$lastDiff");
             if ($diff > 0.01 && $lastDiff > 0.01 && !$data->isTeleporting && $data->ticksSinceInCobweb >= 10 && $data->ticksSinceInLiquid >= 10) {
-                if ($this->buff() >= 10) {
+                if ($this->buff($this->updateAndGetViolationAfterTicks($data->currentTick, 5)) >= 10) {
                     $this->flag([
                         "pY" => round($data->previousServerPredictedMotion->y, 5),
                         "mY" => round($data->motion->y, 5)

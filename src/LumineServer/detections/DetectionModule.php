@@ -3,7 +3,6 @@
 namespace LumineServer\detections;
 
 use LumineServer\data\UserData;
-use LumineServer\events\AlertNotificationEvent;
 use LumineServer\Server;
 use LumineServer\Settings;
 use LumineServer\socket\packets\AlertNotificationPacket;
@@ -33,6 +32,7 @@ abstract class DetectionModule {
 	public bool $enabled;
 	public float $violations = 0;
 	public float $buffer = 0;
+	public int $lastFlagTick = 0;
 	public Settings $settings;
 
 	public function __construct(UserData $data, $category, string $subCategory, string $description, bool $experimental = false) {
@@ -177,6 +177,13 @@ abstract class DetectionModule {
 		$packet->type = $type;
 		$packet->message = $broadcast;
 		Server::getInstance()->socketHandler->send($packet, $this->data->socketAddress);
+	}
+
+	protected function updateAndGetViolationAfterTicks(int $tick, int $maxTime): float {
+		$timeDiff = $tick - $this->lastFlagTick;
+		$val = max((($maxTime + min($timeDiff, 1)) - $timeDiff) / $maxTime, 0);
+		$this->lastFlagTick = $tick;
+		return $val;
 	}
 
 	protected function sendDiscordAlert(string $player, string $debug): void {

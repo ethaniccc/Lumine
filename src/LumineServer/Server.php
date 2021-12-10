@@ -165,8 +165,6 @@ final class Server {
 				}
 				if ($delta <= 1 / self::TPS) {
 					$this->tickSleeper->sleepUntil(microtime(true) + (1 / self::TPS) - $delta);
-				} else {
-					$this->logger->log("Server running slower than normal (delta=$delta) - not sleeping to catch up");
 				}
 			} catch (\Error|\Exception $e) {
 				$this->logger->log("The socket server had an error while ticking - a shutdown will be preformed");

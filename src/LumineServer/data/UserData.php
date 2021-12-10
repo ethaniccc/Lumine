@@ -43,6 +43,7 @@ use pocketmine\network\mcpe\protocol\DisconnectPacket;
 use pocketmine\network\mcpe\protocol\MovePlayerPacket;
 use pocketmine\network\mcpe\protocol\TextPacket;
 use pocketmine\network\mcpe\protocol\types\DeviceOS;
+use pocketmine\network\mcpe\protocol\types\InputMode;
 
 final class UserData {
 
@@ -93,6 +94,7 @@ final class UserData {
 	public float $movementSpeed = 0.1;
 	public float $jumpVelocity = MovementConstants::DEFAULT_JUMP_MOTION;
 	public float $gravity = MovementConstants::NORMAL_GRAVITY;
+	public int $inputMode = -1;
 
 	/** @var EffectData[] */
 	public array $effects = [];

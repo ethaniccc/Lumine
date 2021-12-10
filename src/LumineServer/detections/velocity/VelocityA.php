@@ -30,7 +30,7 @@ final class VelocityA extends DetectionModule {
 				$percentage = ($movement / $expected) * 100;
 				$this->debug("pct=$percentage%");
 				if ($percentage < $this->settings->get("min_pct", 99.99) || $percentage > $this->settings->get("max_pct", 110)) {
-					if ($this->buff() >= 4) {
+					if ($this->buff() >= 12) {
 						$this->flag([
 							"pct" => round($percentage, 3) . "%"
 						]);

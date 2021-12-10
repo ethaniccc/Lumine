@@ -29,15 +29,15 @@ final class InvalidMovementA extends DetectionModule {
 			$this->debug("xDiff={$diffVec->x} zDiff={$diffVec->z} max=$max");
 			if (($diffVec->x > $max || $diffVec->z > $max) && ($lastDiffVec->x > $max || $lastDiffVec->z > $max) && !$data->isTeleporting && $data->ticksSinceInLiquid >= 10
 			&& $data->ticksSinceInCobweb >= 10) {
-				if ($this->buff() >= 10) {
+				if ($this->buff($this->updateAndGetViolationAfterTicks($data->currentTick, 5)) >= 10) {
 					$this->flag([
 						"xD" => round($diffVec->x, 5),
 						"zD" => round($diffVec->z, 5)
 					]);
 				}
 			} else {
-				$this->buff(-0.02);
 				$this->violations = max($this->violations - 0.01, 0);
+				$this->buff(-0.01);
 			}
 			$this->previousPrediction = clone $data->previousServerPredictedMotion;
 		}

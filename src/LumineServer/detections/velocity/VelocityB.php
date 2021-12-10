@@ -22,13 +22,14 @@ final class VelocityB extends DetectionModule {
 			$max = $this->settings->get("max_pct", 150);
 			$this->debug("xPct=$xPct% zPct=$zPct% min=$min max=$max");
 			if (($xPct < $min && $zPct < $min) || ($xPct > $max && $zPct > $max) && !$data->isTeleporting) {
-				if ($this->buff() >= 4) {
+				if ($this->buff($this->updateAndGetViolationAfterTicks($data->currentTick, 400)) >= 3) {
 					$this->flag([
 						"xPct" => round($xPct, 5),
 						"zPct" => round($zPct, 5)
 					]);
 				}
 			} else {
+				$this->buff(-0.1);
 				$this->violations = max($this->violations - 0.05, 0);
 			}
 		}
